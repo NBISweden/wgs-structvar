@@ -22,6 +22,29 @@ if (! bamfile.exists()) {
     exit 1, "The bamfile, '$params.bam', does not exist"
 }
 
+if (!params.fastq) {
+    params.fastq = infer_fastq_from_bam()
+}
+
+if (!params.fastq) {
+    process create_fastq {
+        input:
+        file 'bamfile' from bamfile
+
+        output:
+        file 'fastq' into fastqs
+
+        """
+        ## TODO ADD REAL COMMAND HERE
+        cp bamfile fastq
+        """
+    }
+}
+else {
+    fastqs = Channel.fromPath(params.fastq)
+}
+
+
 def usage_message() {
     log.info ''
     log.info 'Usage:'
@@ -30,5 +53,14 @@ def usage_message() {
     log.info 'Options:'
     log.info '    --help     Show this message and exit'
     log.info '    --bam      Input bamfile'
+    log.info '    --fastq    Input fastqfile (default is bam but with fq as fileending)'
     log.info ''
+}
+
+def infer_fastq_from_bam() {
+    path = params.bam.replaceAll(/.bam$/, '.fq')
+    if (file(path).exists()) {
+        return path
+    }
+    return false
 }
