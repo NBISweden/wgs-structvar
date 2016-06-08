@@ -1,3 +1,7 @@
+# Standup 2016-06-08
+
+Real bamfile will arrive before the weekend.
+
 # First standup 2016-06-02.
 
 `Makefile` and empty data pushed to repo.
