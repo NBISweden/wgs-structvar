@@ -32,11 +32,12 @@ if (!params.fastq) {
         file 'bamfile' from bamfile
 
         output:
-        file 'fastq' into fastqs
+        file 'fastq.gz' into fastqs
+
+        publishDir 'results'
 
         """
-        ## TODO ADD REAL COMMAND HERE
-        cp bamfile fastq
+        $params.programs.samtools bam2fq bamfile | gzip  - > fastq.gz
         """
     }
 }
