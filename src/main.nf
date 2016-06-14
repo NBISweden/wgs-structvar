@@ -29,15 +29,18 @@ if (!params.fastq) {
 if (!params.fastq) {
     process create_fastq {
         input:
-        file 'bamfile' from bamfile
+            file 'bamfile' from bamfile
 
         output:
-        file 'fastq.gz' into fastqs
+            file 'fastq.gz' into fastqs
 
         publishDir 'results'
 
+        module 'bioinfo-tools'
+        module "$params.modules.samtools"
+
         """
-        $params.programs.samtools bam2fq bamfile | gzip  - > fastq.gz
+        samtools bam2fq bamfile | gzip - > fastq.gz
         """
     }
 }
