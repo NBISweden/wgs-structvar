@@ -103,6 +103,36 @@ if ( params.run_manta ) {
 }
 
 
+if (params.run_fermikit) {
+    process fermikit_calling {
+        input:
+            file 'sample.fq.gz' from fastqs
+        output:
+            file 'sample.fermikit.sv.vcf.gz' into fermi_vcf_gz
+            file 'sample.fermikit.sv.vcf' into fermi_vcf
+            file 'sample.fermikit.sv.bed' into fermi_bed
+
+        publishDir 'results'
+
+        module 'bioinfo-tools'
+        module "$params.modules.fermikit"
+        module "$params.modules.samtools"
+        module "$params.modules.vcftools"
+        module "$params.modules.tabix"
+
+        """
+        fermi2.pl unitig -s$params.genome_size -t$params.threads -l$params.readlen -p sample sample.fq.gz > sample.mak
+        make -f sample.mak
+        run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
+        bash calling.sh
+        vcf-sort -c sample.sv.vcf.gz > sample.fermikit.sv.vcf
+        bgzip -c sample.fermikit.sv.vcf > sample.fermikit.sv.vcf.gz
+        $params.programs.svvcf2bed sample.fermikit.sv.vcf > sample.fermikit.sv.bed
+        """
+    }
+}
+
+
 def usage_message() {
     log.info ''
     log.info 'Usage:'
@@ -113,6 +143,7 @@ def usage_message() {
     log.info '    --bam           Input bamfile'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '    --run_manta     Run manta'
+    log.info '    --run_fermikit  Run fermikit'
     log.info ''
 }
 
