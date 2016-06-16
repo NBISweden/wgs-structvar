@@ -31,7 +31,7 @@ if (!params.fastq) {
             file 'bamfile' from bamfile
 
         output:
-            file 'fastq.gz' into fastqs
+            file 'fastq.fq.gz' into fastqs
 
         publishDir 'results'
 
@@ -39,7 +39,7 @@ if (!params.fastq) {
         module "$params.modules.samtools"
 
         """
-        samtools bam2fq bamfile | gzip - > fastq.gz
+        samtools bam2fq bamfile | gzip - > fastq.fq.gz
         """
     }
 }
@@ -117,7 +117,7 @@ def usage_message() {
 }
 
 def infer_fastq_from_bam() {
-    path = params.bam.replaceAll(/.bam$/, '.fq')
+    path = params.bam.replaceAll(/.bam$/, '.fq.gz')
     if (file(path).exists()) {
         return path
     }
