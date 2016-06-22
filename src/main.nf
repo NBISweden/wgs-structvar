@@ -27,32 +27,6 @@ if (! bamfile.exists()) {
     exit 1, "The bamfile, '$params.bam', does not exist"
 }
 
-if (!params.fastq) {
-    params.fastq = infer_fastq_from_bam()
-}
-
-if (!params.fastq) {
-    process create_fastq {
-        input:
-            file 'bamfile' from bamfile
-
-        output:
-            file 'fastq.fq.gz' into fastqs
-
-        publishDir 'results'
-
-        module 'bioinfo-tools'
-        module "$params.modules.samtools"
-
-        """
-        samtools bam2fq bamfile | gzip - > fastq.fq.gz
-        """
-    }
-}
-else {
-    fastqs = Channel.fromPath(params.fastq)
-}
-
 
 if ( params.run_manta ) {
     process index_bamfile {
@@ -110,6 +84,32 @@ if ( params.run_manta ) {
 
 
 if (params.run_fermikit) {
+    if (!params.fastq) {
+        params.fastq = infer_fastq_from_bam()
+    }
+
+    if (!params.fastq) {
+        process create_fastq {
+            input:
+                file 'bamfile' from bamfile
+
+            output:
+                file 'fastq.fq.gz' into fastqs
+
+            publishDir 'results'
+
+            module 'bioinfo-tools'
+            module "$params.modules.samtools"
+
+            """
+            samtools bam2fq bamfile | gzip - > fastq.fq.gz
+            """
+        }
+    }
+    else {
+        Channel.fromPath(params.fastq).set { fastqs }
+    }
+
     process fermikit_calling {
         input:
             file 'sample.fq.gz' from fastqs
