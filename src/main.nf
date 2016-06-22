@@ -38,6 +38,11 @@ if ( params.run_manta ) {
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
+        // We only need one core for this part
+        clusterOptions = {
+            "-A $params.project -p core"
+        }
+
         """
         samtools index bamfile
         """
@@ -100,6 +105,11 @@ if (params.run_fermikit) {
 
             module 'bioinfo-tools'
             module "$params.modules.samtools"
+
+            // We only need one core for this part
+            clusterOptions = {
+                "-A $params.project -p core"
+            }
 
             """
             samtools bam2fq bamfile | gzip - > fastq.fq.gz
