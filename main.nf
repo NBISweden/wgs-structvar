@@ -29,23 +29,30 @@ if (! bamfile.exists()) {
 
 
 if ( params.run_manta ) {
-    process index_bamfile {
-        input:
-            file 'bamfile' from bamfile
-        output:
-            file 'bamfile.bai' into bamfile_index
+    bamindex = infer_bam_index_from_bam()
+    if (!bamindex) {
+        process index_bamfile {
+            input:
+                file 'bamfile' from bamfile
+            output:
+                file 'bamfile.bai' into bamfile_index
 
-        module 'bioinfo-tools'
-        module "$params.modules.samtools"
+            module 'bioinfo-tools'
+            module "$params.modules.samtools"
 
-        // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p core"
+            publishDir 'results'
+
+            // We only need one core for this part
+            clusterOptions = {
+                "-A $params.project -p core"
+            }
+
+            """
+            samtools index bamfile
+            """
         }
-
-        """
-        samtools index bamfile
-        """
+    } else {
+        Channel.fromPath(bamindex).set { bamfile_index }
     }
 
     process run_manta {
@@ -232,8 +239,17 @@ def usage_message() {
     log.info ''
 }
 
+def infer_bam_index_from_bam() {
+    return infer_filename(params.bam, /$/, '.bai')
+}
+
 def infer_fastq_from_bam() {
-    path = params.bam.replaceAll(/.bam$/, '.fq.gz')
+    return infer_filename(params.bam, /.bam$/, '.fq.gz')
+}
+
+def infer_filename(from, match, replace) {
+    path = from.replaceAll(match, replace)
+    println path
     if (file(path).exists()) {
         return path
     }
