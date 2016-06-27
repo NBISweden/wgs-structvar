@@ -27,32 +27,6 @@ if (! bamfile.exists()) {
     exit 1, "The bamfile, '$params.bam', does not exist"
 }
 
-if (!params.fastq) {
-    params.fastq = infer_fastq_from_bam()
-}
-
-if (!params.fastq) {
-    process create_fastq {
-        input:
-            file 'bamfile' from bamfile
-
-        output:
-            file 'fastq.fq.gz' into fastqs
-
-        publishDir 'results'
-
-        module 'bioinfo-tools'
-        module "$params.modules.samtools"
-
-        """
-        samtools bam2fq bamfile | gzip - > fastq.fq.gz
-        """
-    }
-}
-else {
-    fastqs = Channel.fromPath(params.fastq)
-}
-
 
 if ( params.run_manta ) {
     process index_bamfile {
@@ -64,6 +38,11 @@ if ( params.run_manta ) {
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
+        // We only need one core for this part
+        clusterOptions = {
+            "-A $params.project -p core"
+        }
+
         """
         samtools index bamfile
         """
@@ -74,9 +53,9 @@ if ( params.run_manta ) {
             file 'bamfile_tmp' from bamfile
             file 'bamfile.bai' from bamfile_index
         output:
-            file 'sample.manta.sv.vcf.gz' into manta_vcf_gz
-            file 'sample.manta.sv.vcf' into manta_vcf
-            file 'sample.manta.sv.bed' into manta_bed
+            file 'manta.sv.vcf.gz' into manta_vcf_gz
+            file 'manta.sv.vcf' into manta_vcf
+            file 'manta.sv.bed' into manta_bed
 
         publishDir 'results'
 
@@ -100,23 +79,54 @@ if ( params.run_manta ) {
         configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
         cd testRun
         ./runWorkflow.py -m local -j $params.threads
-        mv results/variants/diploidSV.vcf.gz ../sample.manta.sv.vcf.gz
+        mv results/variants/diploidSV.vcf.gz ../manta.sv.vcf.gz
         cd ..
-        gunzip -c sample.manta.sv.vcf.gz > sample.manta.sv.vcf
-        $params.programs.svvcf2bed sample.manta.sv.vcf > sample.manta.sv.bed
+        gunzip -c manta.sv.vcf.gz > manta.sv.vcf
+        $params.programs.svvcf2bed manta.sv.vcf > manta.sv.bed
         """
     }
 }
 
 
 if (params.run_fermikit) {
+    if (!params.fastq) {
+        params.fastq = infer_fastq_from_bam()
+    }
+
+    if (!params.fastq) {
+        process create_fastq {
+            input:
+                file 'bamfile' from bamfile
+
+            output:
+                file 'fastq.fq.gz' into fastqs
+
+            publishDir 'results'
+
+            module 'bioinfo-tools'
+            module "$params.modules.samtools"
+
+            // We only need one core for this part
+            clusterOptions = {
+                "-A $params.project -p core"
+            }
+
+            """
+            samtools bam2fq bamfile | gzip - > fastq.fq.gz
+            """
+        }
+    }
+    else {
+        Channel.fromPath(params.fastq).set { fastqs }
+    }
+
     process fermikit_calling {
         input:
             file 'sample.fq.gz' from fastqs
         output:
-            file 'sample.fermikit.sv.vcf.gz' into fermi_vcf_gz
-            file 'sample.fermikit.sv.vcf' into fermi_vcf
-            file 'sample.fermikit.sv.bed' into fermi_bed
+            file 'fermikit.sv.vcf.gz' into fermi_vcf_gz
+            file 'fermikit.sv.vcf' into fermi_vcf
+            file 'fermikit.sv.bed' into fermi_bed
 
         publishDir 'results'
 
@@ -131,9 +141,9 @@ if (params.run_fermikit) {
         make -f sample.mak
         run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
         bash calling.sh
-        vcf-sort -c sample.sv.vcf.gz > sample.fermikit.sv.vcf
-        bgzip -c sample.fermikit.sv.vcf > sample.fermikit.sv.vcf.gz
-        $params.programs.svvcf2bed sample.fermikit.sv.vcf > sample.fermikit.sv.bed
+        vcf-sort -c sample.sv.vcf.gz > fermikit.sv.vcf
+        bgzip -c fermikit.sv.vcf > fermikit.sv.vcf.gz
+        $params.programs.svvcf2bed fermikit.sv.vcf > fermikit.sv.bed
         """
     }
 }
