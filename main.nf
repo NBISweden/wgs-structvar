@@ -187,7 +187,7 @@ if (params.run_intersections) {
 
         // We only need one core for this part
         clusterOptions = {
-            '-A $params.project -p core'
+            "-A $params.project -p core"
         }
 
         module 'bioinfo-tools'
