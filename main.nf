@@ -249,7 +249,6 @@ def infer_fastq_from_bam() {
 
 def infer_filename(from, match, replace) {
     path = from.replaceAll(match, replace)
-    println path
     if (file(path).exists()) {
         return path
     }
