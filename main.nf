@@ -240,7 +240,9 @@ def usage_message() {
 }
 
 def infer_bam_index_from_bam() {
+    // If the ".bam.bai" file does not exist, try ".bai" without ".bam"
     return infer_filename(params.bam, /$/, '.bai')
+        ?: infer_filename(params.bam, /.bam$/, '.bai')
 }
 
 def infer_fastq_from_bam() {
