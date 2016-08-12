@@ -89,7 +89,7 @@ if ( params.run_manta ) {
         mv results/variants/diploidSV.vcf.gz ../manta.sv.vcf.gz
         cd ..
         gunzip -c manta.sv.vcf.gz > manta.sv.vcf
-        $params.programs.svvcf2bed manta.sv.vcf > manta.sv.bed
+        $params.svvcf2bed manta.sv.vcf > manta.sv.bed
         """
     }
 }
@@ -150,7 +150,7 @@ if (params.run_fermikit) {
         bash calling.sh
         vcf-sort -c sample.sv.vcf.gz > fermikit.sv.vcf
         bgzip -c fermikit.sv.vcf > fermikit.sv.vcf.gz
-        $params.programs.svvcf2bed fermikit.sv.vcf > fermikit.sv.bed
+        $params.svvcf2bed fermikit.sv.vcf > fermikit.sv.bed
         """
     }
 }
