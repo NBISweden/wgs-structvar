@@ -28,6 +28,7 @@ if (! bamfile.exists()) {
 }
 
 
+// 1. Run manta
 if ( params.run_manta ) {
     bamindex = infer_bam_index_from_bam()
     if (!bamindex) {
@@ -95,6 +96,7 @@ if ( params.run_manta ) {
 }
 
 
+// 2. Run fermikit
 if (params.run_fermikit) {
     if (!params.fastq) {
         params.fastq = infer_fastq_from_bam()
@@ -155,6 +157,8 @@ if (params.run_fermikit) {
     }
 }
 
+
+// 3. Create summary files
 if (params.run_intersections) {
     process download_masks {
         output:
