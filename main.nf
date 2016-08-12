@@ -247,17 +247,17 @@ def usage_message() {
 
 def infer_bam_index_from_bam() {
     // If the ".bam.bai" file does not exist, try ".bai" without ".bam"
-    return infer_filename(params.bam, /$/, '.bai')
-        ?: infer_filename(params.bam, /.bam$/, '.bai')
+    return infer_filepath(params.bam, /$/, '.bai')
+        ?: infer_filepath(params.bam, /.bam$/, '.bai')
 }
 
 def infer_fastq_from_bam() {
-    return infer_filename(params.bam, /.bam$/, '.fq.gz')
+    return infer_filepath(params.bam, /.bam$/, '.fq.gz')
 }
 
-def infer_filename(from, match, replace) {
-    path = from.replaceAll(match, replace)
-    if (file(path).exists()) {
+def infer_filepath(from, match, replace) {
+    path = file( from.replaceAll(match, replace) )
+    if (path.exists()) {
         return path
     }
     return false
