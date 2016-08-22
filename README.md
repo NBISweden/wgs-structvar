@@ -1,4 +1,4 @@
-# Whole Genome Sequenceing Structural Variation Pipelines
+# Whole Genome Sequencing Structural Variation Pipelines
 
 Pipelines for WGS Structural variation analysis.
 
@@ -6,7 +6,7 @@ Status: Work in progress.
 
 ## How to run reference piplines in Make
 
-This command will run the pipelines implemented by @pallolason in Make (and
+This command will dry-run the prototype pipeline implemented by @pallolason in Make (and
 which are supposed to be re-implemented in Nextflow as part of this project),
 on a small example dataset:
 
