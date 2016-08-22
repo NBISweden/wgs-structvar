@@ -176,71 +176,102 @@ process fermikit_calling {
 
 
 // 3. Create summary files
+mask_urls = [
+    "https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed",
+    "https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz"
+]
+
+Channel.from( 0..<mask_urls.size() ).map { [it, mask_urls[it]] }.set { mask_urls_channel }
+
 process download_masks {
+    input:
+        set val(index), val(mask_url) from mask_urls_channel
     output:
-        file 'ceph18.b37.lumpy.exclude.2014-01-15.bed' into mask_ceph
-        file 'LCR-hs37d5.bed.gz' into mask_lcr
+        file 'mask_*.bed.gz' into masks
 
     // We only need one core for this part
     clusterOptions = {
-        "-A $params.project -p core"
+        "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
     }
 
     """
-    wget https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed
-    wget https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz
+    wget -O mask_${index}.bed.gz $mask_url
     """
 }
 
-process run_intersections {
+
+// Collect both bed files and combine them with the mask files
+beds = manta_bed.mix( fermi_bed )
+beds.spread( masks.buffer(size: 2) ).set { mask_input }
+
+process mask_beds {
     input:
-        file 'manta.bed' from manta_bed
-        file 'fermi.bed' from fermi_bed
-        file 'mask_ceph.bed' from mask_ceph
-        file 'mask_lcr.bed' from mask_lcr
+        set file(bedfile), file(mask1), file(mask2) from mask_input
     output:
-        file 'manta_masked*.bed'
-        file 'fermi_masked*.bed'
-        file 'combined*.bed'
+        file '*_masked.bed' into masked_beds
+        file '*_masked_*.bed'
 
     publishDir 'results'
 
-    // We only need one core for this part
     clusterOptions = {
-        "-A $params.project -p core"
+        "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
     }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
 
     """
-    cat manta.bed \
-        | bedtools intersect -v -a stdin -b mask_lcr.bed -f 0.25 \
-        | bedtools intersect -v -a stdin -b mask_ceph.bed -f 0.25 > manta_masked.bed
-    cat fermi.bed \
-        | bedtools intersect -v -a stdin -b mask_lcr.bed -f 0.25 \
-        | bedtools intersect -v -a stdin -b mask_ceph.bed -f 0.25 > fermi_masked.bed
+    BNAME=\$( echo $bedfile | cut -d. -f1 )
+    MASK_FILE=\${BNAME}_masked.bed
+    cat $bedfile \
+        | bedtools intersect -v -a stdin -b $mask1 -f 0.25 \
+        | bedtools intersect -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
 
-    ## In case grep doesn't find anything we want to continue
+
     set +e
 
     ## Create filtered bed files
-    for FILE in manta_masked fermi_masked; do
-        for WORD in DEL INS DUP; do
-            grep -w \$WORD \$FILE.bed > \$FILE.\$WORD.bed
-        done
-    done
-
-    ## But now we want to abort in case of errors
-    set -e
-
-    ## Create intersected bed file
     for WORD in DEL INS DUP; do
-        intersectBed -a fermi_masked.\$WORD.bed -b manta_masked.DEL.bed -f 0.5 -r | sort -k1,1V -k2,2n > combined_masked.SV.\$WORD.bed
+        grep -w \$WORD \$MASK_FILE > \${BNAME}_masked_\${WORD,,}.bed
     done
+
+    set -e
     """
 }
 
+// To make intersect files we need to combine them into one channel with
+// toList(). And also figure out if we have one or two files, therefore the
+// tap and count_beds.
+masked_beds.tap { count_beds_tmp }.toList().set { intersect_input }
+count_beds_tmp.count().set { count_beds }
+
+process intersect_files {
+    input:
+        set file(bed1), file(bed2) from intersect_input
+        val nbeds from count_beds
+    output:
+        file "combined*.bed"
+
+    publishDir 'results'
+
+    module 'bioinfo-tools'
+    module "$params.modules.bedtools"
+
+    when: nbeds == 2
+
+    script:
+    """
+    ## In case grep doesn't find anything we want to continue
+    set +e
+
+    ## Create intersected bed files
+    for WORD in DEL INS DUP; do
+        intersectBed -a <( grep -w \$WORD $bed1 ) -b <( grep -w \$WORD $bed2 ) \
+            -f 0.5 -r \
+            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.bed
+    done
+    """
+}
 
 def usage_message() {
     log.info ''
