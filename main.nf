@@ -50,7 +50,7 @@ if (!bamindex) {
 
         // We only need one core for this part
         clusterOptions = {
-            "-A $params.project -p core"
+            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
         }
 
         when: params.run_manta == true
@@ -128,7 +128,7 @@ if (!params.fastq) {
 
         // We only need one core for this part
         clusterOptions = {
-            "-A $params.project -p core"
+            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
         }
 
         when: params.run_fermikit == true
