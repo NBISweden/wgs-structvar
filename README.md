@@ -4,7 +4,7 @@ Pipelines for WGS Structural variation analysis.
 
 Status: Work in progress.
 
-## How to run reference piplines in Make
+## How to run prototype pipeline in Make
 
 This command will dry-run the prototype pipeline implemented by @pallolason in Make (and
 which are supposed to be re-implemented in Nextflow as part of this project),
