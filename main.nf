@@ -35,133 +35,144 @@ if (!svvcf2bed.exists()) {
 
 
 // 1. Run manta
-if ( params.run_manta ) {
-    bamindex = infer_bam_index_from_bam()
-    if (!bamindex) {
-        process index_bamfile {
-            input:
-                file 'bamfile' from bamfile
-            output:
-                file 'bamfile.bai' into bamfile_index
-
-            module 'bioinfo-tools'
-            module "$params.modules.samtools"
-
-            publishDir 'results'
-
-            // We only need one core for this part
-            clusterOptions = {
-                "-A $params.project -p core"
-            }
-
-            """
-            samtools index bamfile
-            """
-        }
-    } else {
-        Channel.fromPath(bamindex).set { bamfile_index }
-    }
-
-    process run_manta {
+bamindex = infer_bam_index_from_bam()
+if (!bamindex) {
+    process index_bamfile {
         input:
-            file 'bamfile_tmp' from bamfile
-            file 'bamfile.bai' from bamfile_index
+            file 'bamfile' from bamfile
         output:
-            file 'manta.sv.vcf.gz' into manta_vcf_gz
-            file 'manta.sv.vcf' into manta_vcf
-            file 'manta.sv.bed' into manta_bed
+            file 'bamfile.bai' into bamfile_index
+
+        module 'bioinfo-tools'
+        module "$params.modules.samtools"
 
         publishDir 'results'
 
-        module 'bioinfo-tools'
-        module "$params.modules.manta"
-
-        """
-        # Manta follows symlinks and expects the index to be with the original
-        # file, so we copy it, and then clean up at script EXIT with a trap.
-        # TODO, this is fixed in manta v0.29.5, https://github.com/Illumina/manta/issues/32
-        DIR=`pwd`
-        function cleanup() {
-            cd \$DIR
-            if [ -f bamfile ]; then
-                rm bamfile
-            fi
+        // We only need one core for this part
+        clusterOptions = {
+            "-A $params.project -p core"
         }
-        trap cleanup EXIT
-        cp bamfile_tmp bamfile
 
-        configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
-        cd testRun
-        ./runWorkflow.py -m local -j $params.threads
-        mv results/variants/diploidSV.vcf.gz ../manta.sv.vcf.gz
-        cd ..
-        gunzip -c manta.sv.vcf.gz > manta.sv.vcf
-        $svvcf2bed manta.sv.vcf > manta.sv.bed
+        when: params.run_manta == true
+
+        script:
+        """
+        samtools index bamfile
         """
     }
+}
+else {
+    Channel.fromPath( bamindex ).set { bamfile_index }
+}
+
+process run_manta {
+    input:
+        file 'bamfile_tmp' from bamfile
+        file 'bamfile.bai' from bamfile_index
+    output:
+        file 'manta.vcf.gz'
+        file 'manta.vcf'
+        file 'manta.bed' into manta_bed
+
+    publishDir 'results'
+
+    module 'bioinfo-tools'
+    module "$params.modules.manta"
+
+    when: params.run_manta == true
+
+    script:
+    """
+    # Manta follows symlinks and expects the index to be with the original
+    # file, so we copy it, and then clean up at script EXIT with a trap.
+    # TODO, this is fixed in manta v0.29.5, https://github.com/Illumina/manta/issues/32
+    DIR=`pwd`
+    function cleanup() {
+        echo "CLEAN UP"
+        cd \$DIR
+        if [ -f bamfile ]; then
+            rm bamfile
+        fi
+    }
+    trap cleanup EXIT
+    cp bamfile_tmp bamfile
+
+    configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
+    cd testRun
+    ./runWorkflow.py -m local -j $params.threads
+    mv results/variants/diploidSV.vcf.gz ../manta.vcf.gz
+    cd ..
+    gunzip -c manta.vcf.gz > manta.vcf
+    $svvcf2bed manta.vcf > manta.bed
+    """
 }
 
 
 // 2. Run fermikit
-if (params.run_fermikit) {
-    if (!params.fastq) {
-        params.fastq = infer_fastq_from_bam()
-    }
+if (!params.fastq) {
+    params.fastq = infer_fastq_from_bam()
+}
 
-    if (!params.fastq) {
-        process create_fastq {
-            input:
-                file 'bamfile' from bamfile
-
-            output:
-                file 'fastq.fq.gz' into fastqs
-
-            publishDir 'results'
-
-            module 'bioinfo-tools'
-            module "$params.modules.samtools"
-
-            // We only need one core for this part
-            clusterOptions = {
-                "-A $params.project -p core"
-            }
-
-            """
-            samtools bam2fq bamfile | gzip - > fastq.fq.gz
-            """
-        }
-    }
-    else {
-        Channel.fromPath(params.fastq).set { fastqs }
-    }
-
-    process fermikit_calling {
+if (!params.fastq) {
+    process create_fastq {
         input:
-            file 'sample.fq.gz' from fastqs
+            file 'bamfile' from bamfile
+
         output:
-            file 'fermikit.sv.vcf.gz' into fermi_vcf_gz
-            file 'fermikit.sv.vcf' into fermi_vcf
-            file 'fermikit.sv.bed' into fermi_bed
+            file 'fastq.fq.gz' into fastqs
 
         publishDir 'results'
 
         module 'bioinfo-tools'
-        module "$params.modules.fermikit"
         module "$params.modules.samtools"
-        module "$params.modules.vcftools"
-        module "$params.modules.tabix"
 
+        // We only need one core for this part
+        clusterOptions = {
+            "-A $params.project -p core"
+        }
+
+        when: params.run_fermikit == true
+
+        script:
         """
-        fermi2.pl unitig -s$params.genome_size -t$params.threads -l$params.readlen -p sample sample.fq.gz > sample.mak
-        make -f sample.mak
-        run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
-        bash calling.sh
-        vcf-sort -c sample.sv.vcf.gz > fermikit.sv.vcf
-        bgzip -c fermikit.sv.vcf > fermikit.sv.vcf.gz
-        $svvcf2bed fermikit.sv.vcf > fermikit.sv.bed
+        samtools bam2fq bamfile | gzip - > fastq.fq.gz
         """
     }
 }
+else {
+    Channel.fromPath( params.fastq ).set { fastqs }
+}
+
+process fermikit_calling {
+    input:
+        file 'sample.fq.gz' from fastqs
+    output:
+        file 'fermikit.vcf.gz'
+        file 'fermikit.vcf'
+        file 'fermikit.bed' into fermi_bed
+
+    publishDir 'results'
+
+    module 'bioinfo-tools'
+    module "$params.modules.fermikit"
+    module "$params.modules.samtools"
+    module "$params.modules.vcftools"
+    module "$params.modules.tabix"
+
+    when: params.run_fermikit == true
+
+    script:
+    """
+    fermi2.pl unitig -s$params.genome_size -t$params.threads -l$params.readlen -p sample sample.fq.gz > sample.mak
+    make -f sample.mak
+    run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
+    bash calling.sh
+    vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
+    bgzip -c fermikit.vcf > fermikit.vcf.gz
+    $svvcf2bed fermikit.vcf > fermikit.bed
+    """
+}
+
 
 
 // 3. Create summary files
