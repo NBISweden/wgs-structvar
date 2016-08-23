@@ -199,10 +199,8 @@ process download_masks {
     output:
         file 'mask_*.bed.gz' into masks
 
-    // We only need one core for this part
-    clusterOptions = {
-        "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
-    }
+    // Does not use many resources, run it locally
+    executor 'local'
 
     """
     wget -O mask_${index}.bed.gz $mask_url
@@ -223,9 +221,8 @@ process mask_beds {
 
     publishDir 'results'
 
-    clusterOptions = {
-        "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
-    }
+    // Does not use many resources, run it locally
+    executor 'local'
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -266,6 +263,9 @@ process intersect_files {
         file "combined*.bed"
 
     publishDir 'results'
+
+    // Does not use many resources, run it locally
+    executor 'local'
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
