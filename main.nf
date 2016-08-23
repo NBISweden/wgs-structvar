@@ -35,6 +35,11 @@ if (!svvcf2bed.exists()) {
 
 
 // 1. Run manta
+
+
+// Try to guess location of bamindex file. If we can't find it create it
+// else put that in the bamfile_index channel.
+
 bamindex = infer_bam_index_from_bam()
 if (!bamindex) {
     process index_bamfile {
@@ -62,6 +67,7 @@ if (!bamindex) {
     }
 }
 else {
+    // The bamfile file already exists, put it in the channel.
     Channel.fromPath( bamindex ).set { bamfile_index }
 }
 
@@ -109,6 +115,9 @@ process run_manta {
 
 
 // 2. Run fermikit
+
+// Try to guess location of fastq file. If we can't find it create it
+// else put that in the fastqs channel.
 if (!params.fastq) {
     params.fastq = infer_fastq_from_bam()
 }
@@ -140,6 +149,7 @@ if (!params.fastq) {
     }
 }
 else {
+    // The fastq file already exists, put it in the channel.
     Channel.fromPath( params.fastq ).set { fastqs }
 }
 
@@ -228,6 +238,9 @@ process mask_beds {
         | bedtools intersect -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
 
 
+    ## In case grep doesn't find anything it will exit with non-zero exit
+    ## status, which will cause slurm to abort the job, we want to continue on
+    ## error here.
     set +e
 
     ## Create filtered bed files
@@ -235,7 +248,7 @@ process mask_beds {
         grep -w \$WORD \$MASK_FILE > \${BNAME}_masked_\${WORD,,}.bed
     done
 
-    set -e
+    set -e # Restore exit-settings
     """
 }
 
@@ -261,7 +274,9 @@ process intersect_files {
 
     script:
     """
-    ## In case grep doesn't find anything we want to continue
+    ## In case grep doesn't find anything it will exit with non-zero exit
+    ## status, which will cause slurm to abort the job, we want to continue on
+    ## error here.
     set +e
 
     ## Create intersected bed files
@@ -270,6 +285,8 @@ process intersect_files {
             -f 0.5 -r \
             | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.bed
     done
+
+    set -e # Restore exit-settings
     """
 }
 
