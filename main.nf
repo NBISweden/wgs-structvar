@@ -18,7 +18,6 @@ if (!params.bam) {
 if (params.run_all) {
     params.run_fermikit = true
     params.run_manta = true
-    params.run_intersections = true
 }
 
 bamfile = file(params.bam)
@@ -36,203 +35,260 @@ if (!svvcf2bed.exists()) {
 
 
 // 1. Run manta
-if ( params.run_manta ) {
-    bamindex = infer_bam_index_from_bam()
-    if (!bamindex) {
-        process index_bamfile {
-            input:
-                file 'bamfile' from bamfile
-            output:
-                file 'bamfile.bai' into bamfile_index
 
-            module 'bioinfo-tools'
-            module "$params.modules.samtools"
 
-            publishDir 'results'
+// Try to guess location of bamindex file. If we can't find it create it
+// else put that in the bamfile_index channel.
 
-            // We only need one core for this part
-            clusterOptions = {
-                "-A $params.project -p core"
-            }
-
-            """
-            samtools index bamfile
-            """
-        }
-    } else {
-        Channel.fromPath(bamindex).set { bamfile_index }
-    }
-
-    process run_manta {
+bamindex = infer_bam_index_from_bam()
+if (!bamindex) {
+    process index_bamfile {
         input:
-            file 'bamfile_tmp' from bamfile
-            file 'bamfile.bai' from bamfile_index
+            file 'bamfile' from bamfile
         output:
-            file 'manta.sv.vcf.gz' into manta_vcf_gz
-            file 'manta.sv.vcf' into manta_vcf
-            file 'manta.sv.bed' into manta_bed
+            file 'bamfile.bai' into bamfile_index
+
+        module 'bioinfo-tools'
+        module "$params.modules.samtools"
 
         publishDir 'results'
 
-        module 'bioinfo-tools'
-        module "$params.modules.manta"
-
-        """
-        # Manta follows symlinks and expects the index to be with the original
-        # file, so we copy it, and then clean up at script EXIT with a trap.
-        # TODO, this is fixed in manta v0.29.5, https://github.com/Illumina/manta/issues/32
-        DIR=`pwd`
-        function cleanup() {
-            cd \$DIR
-            if [ -f bamfile ]; then
-                rm bamfile
-            fi
+        // We only need one core for this part
+        clusterOptions = {
+            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
         }
-        trap cleanup EXIT
-        cp bamfile_tmp bamfile
 
-        configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
-        cd testRun
-        ./runWorkflow.py -m local -j $params.threads
-        mv results/variants/diploidSV.vcf.gz ../manta.sv.vcf.gz
-        cd ..
-        gunzip -c manta.sv.vcf.gz > manta.sv.vcf
-        $svvcf2bed manta.sv.vcf > manta.sv.bed
+        when: params.run_manta == true
+
+        script:
+        """
+        samtools index bamfile
         """
     }
+}
+else {
+    // The bamfile file already exists, put it in the channel.
+    Channel.fromPath( bamindex ).set { bamfile_index }
+}
+
+process run_manta {
+    input:
+        file 'bamfile_tmp' from bamfile
+        file 'bamfile.bai' from bamfile_index
+    output:
+        file 'manta.vcf.gz'
+        file 'manta.vcf'
+        file 'manta.bed' into manta_bed
+
+    publishDir 'results'
+
+    module 'bioinfo-tools'
+    module "$params.modules.manta"
+
+    when: params.run_manta == true
+
+    script:
+    """
+    # Manta follows symlinks and expects the index to be with the original
+    # file, so we copy it, and then clean up at script EXIT with a trap.
+    # TODO, this is fixed in manta v0.29.5, https://github.com/Illumina/manta/issues/32
+    DIR=`pwd`
+    function cleanup() {
+        echo "CLEAN UP"
+        cd \$DIR
+        if [ -f bamfile ]; then
+            rm bamfile
+        fi
+    }
+    trap cleanup EXIT
+    cp bamfile_tmp bamfile
+
+    configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
+    cd testRun
+    ./runWorkflow.py -m local -j $params.threads
+    mv results/variants/diploidSV.vcf.gz ../manta.vcf.gz
+    cd ..
+    gunzip -c manta.vcf.gz > manta.vcf
+    $svvcf2bed manta.vcf > manta.bed
+    """
 }
 
 
 // 2. Run fermikit
-if (params.run_fermikit) {
-    if (!params.fastq) {
-        params.fastq = infer_fastq_from_bam()
-    }
 
-    if (!params.fastq) {
-        process create_fastq {
-            input:
-                file 'bamfile' from bamfile
+// Try to guess location of fastq file. If we can't find it create it
+// else put that in the fastq channel.
+if (!params.fastq) {
+    params.fastq = infer_fastq_from_bam()
+}
 
-            output:
-                file 'fastq.fq.gz' into fastqs
-
-            publishDir 'results'
-
-            module 'bioinfo-tools'
-            module "$params.modules.samtools"
-
-            // We only need one core for this part
-            clusterOptions = {
-                "-A $params.project -p core"
-            }
-
-            """
-            samtools bam2fq bamfile | gzip - > fastq.fq.gz
-            """
-        }
-    }
-    else {
-        Channel.fromPath(params.fastq).set { fastqs }
-    }
-
-    process fermikit_calling {
+if (!params.fastq) {
+    process create_fastq {
         input:
-            file 'sample.fq.gz' from fastqs
+            file 'bamfile' from bamfile
+
         output:
-            file 'fermikit.sv.vcf.gz' into fermi_vcf_gz
-            file 'fermikit.sv.vcf' into fermi_vcf
-            file 'fermikit.sv.bed' into fermi_bed
+            file 'fastq.fq.gz' into fastq
 
         publishDir 'results'
 
         module 'bioinfo-tools'
-        module "$params.modules.fermikit"
         module "$params.modules.samtools"
-        module "$params.modules.vcftools"
-        module "$params.modules.tabix"
 
+        // We only need one core for this part
+        clusterOptions = {
+            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
+        }
+
+        when: params.run_fermikit == true
+
+        script:
         """
-        fermi2.pl unitig -s$params.genome_size -t$params.threads -l$params.readlen -p sample sample.fq.gz > sample.mak
-        make -f sample.mak
-        run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
-        bash calling.sh
-        vcf-sort -c sample.sv.vcf.gz > fermikit.sv.vcf
-        bgzip -c fermikit.sv.vcf > fermikit.sv.vcf.gz
-        $svvcf2bed fermikit.sv.vcf > fermikit.sv.bed
+        samtools bam2fq bamfile | gzip - > fastq.fq.gz
         """
     }
 }
+else {
+    // The fastq file already exists, put it in the channel.
+    Channel.fromPath( params.fastq ).set { fastq }
+}
+
+process fermikit_calling {
+    input:
+        file 'sample.fq.gz' from fastq
+    output:
+        file 'fermikit.vcf.gz'
+        file 'fermikit.vcf'
+        file 'fermikit.bed' into fermi_bed
+
+    publishDir 'results'
+
+    module 'bioinfo-tools'
+    module "$params.modules.fermikit"
+    module "$params.modules.samtools"
+    module "$params.modules.vcftools"
+    module "$params.modules.tabix"
+
+    when: params.run_fermikit == true
+
+    script:
+    """
+    fermi2.pl unitig -s$params.genome_size -t$params.threads -l$params.readlen -p sample sample.fq.gz > sample.mak
+    make -f sample.mak
+    run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
+    bash calling.sh
+    vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
+    bgzip -c fermikit.vcf > fermikit.vcf.gz
+    $svvcf2bed fermikit.vcf > fermikit.bed
+    """
+}
+
 
 
 // 3. Create summary files
-if (params.run_intersections) {
-    process download_masks {
-        output:
-            file 'ceph18.b37.lumpy.exclude.2014-01-15.bed' into mask_ceph
-            file 'LCR-hs37d5.bed.gz' into mask_lcr
+mask_urls = [
+    "https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed",
+    "https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz"
+]
 
-        // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p core"
-        }
+Channel.from( 0..<mask_urls.size() ).map { [it, mask_urls[it]] }.set { mask_urls_channel }
 
-        """
-        wget https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed
-        wget https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz
-        """
+process download_masks {
+    input:
+        set val(index), val(mask_url) from mask_urls_channel
+    output:
+        file 'mask_*.bed.gz' into masks
+
+    // We only need one core for this part
+    clusterOptions = {
+        "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
     }
 
-    process run_intersections {
-        input:
-            file 'manta.bed' from manta_bed
-            file 'fermi.bed' from fermi_bed
-            file 'mask_ceph.bed' from mask_ceph
-            file 'mask_lcr.bed' from mask_lcr
-        output:
-            file 'manta_masked*.bed'
-            file 'fermi_masked*.bed'
-            file 'combined*.bed'
-
-        publishDir 'results'
-
-        // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p core"
-        }
-
-        module 'bioinfo-tools'
-        module "$params.modules.bedtools"
-
-        """
-        cat manta.bed \
-            | bedtools intersect -v -a stdin -b mask_lcr.bed -f 0.25 \
-            | bedtools intersect -v -a stdin -b mask_ceph.bed -f 0.25 > manta_masked.bed
-        cat fermi.bed \
-            | bedtools intersect -v -a stdin -b mask_lcr.bed -f 0.25 \
-            | bedtools intersect -v -a stdin -b mask_ceph.bed -f 0.25 > fermi_masked.bed
-
-        ## In case grep doesn't find anything we want to continue
-        set +e
-
-        ## Create filtered bed files
-        for FILE in manta_masked fermi_masked; do
-            for WORD in DEL INS DUP; do
-                grep -w \$WORD \$FILE.bed > \$FILE.\$WORD.bed
-            done
-        done
-
-        ## But now we want to abort in case of errors
-        set -e
-
-        ## Create intersected bed file
-        for WORD in DEL INS DUP; do
-            intersectBed -a fermi_masked.\$WORD.bed -b manta_masked.DEL.bed -f 0.5 -r | sort -k1,1V -k2,2n > combined_masked.SV.\$WORD.bed
-        done
-        """
-    }
+    """
+    wget -O mask_${index}.bed.gz $mask_url
+    """
 }
 
+
+// Collect both bed files and combine them with the mask files
+beds = manta_bed.mix( fermi_bed )
+beds.spread( masks.buffer(size: 2) ).set { mask_input }
+
+process mask_beds {
+    input:
+        set file(bedfile), file(mask1), file(mask2) from mask_input
+    output:
+        file '*_masked.bed' into masked_beds
+        file '*_masked_*.bed'
+
+    publishDir 'results'
+
+    clusterOptions = {
+        "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
+    }
+
+    module 'bioinfo-tools'
+    module "$params.modules.bedtools"
+
+    """
+    BNAME=\$( echo $bedfile | cut -d. -f1 )
+    MASK_FILE=\${BNAME}_masked.bed
+    cat $bedfile \
+        | bedtools intersect -v -a stdin -b $mask1 -f 0.25 \
+        | bedtools intersect -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
+
+
+    ## In case grep doesn't find anything it will exit with non-zero exit
+    ## status, which will cause slurm to abort the job, we want to continue on
+    ## error here.
+    set +e
+
+    ## Create filtered bed files
+    for WORD in DEL INS DUP; do
+        grep -w \$WORD \$MASK_FILE > \${BNAME}_masked_\${WORD,,}.bed
+    done
+
+    set -e # Restore exit-settings
+    """
+}
+
+// To make intersect files we need to combine them into one channel with
+// toList(). And also figure out if we have one or two files, therefore the
+// tap and count_beds.
+masked_beds.tap { count_beds_tmp }.toList().set { intersect_input }
+count_beds_tmp.count().set { count_beds }
+
+process intersect_files {
+    input:
+        set file(bed1), file(bed2) from intersect_input
+        val nbeds from count_beds
+    output:
+        file "combined*.bed"
+
+    publishDir 'results'
+
+    module 'bioinfo-tools'
+    module "$params.modules.bedtools"
+
+    when: nbeds == 2
+
+    script:
+    """
+    ## In case grep doesn't find anything it will exit with non-zero exit
+    ## status, which will cause slurm to abort the job, we want to continue on
+    ## error here.
+    set +e
+
+    ## Create intersected bed files
+    for WORD in DEL INS DUP; do
+        intersectBed -a <( grep -w \$WORD $bed1 ) -b <( grep -w \$WORD $bed2 ) \
+            -f 0.5 -r \
+            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.bed
+    done
+
+    set -e # Restore exit-settings
+    """
+}
 
 def usage_message() {
     log.info ''
@@ -247,7 +303,6 @@ def usage_message() {
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '    --run_manta     Run manta'
     log.info '    --run_fermikit  Run fermikit'
-    log.info '    --run_intersections  Run intersections'
     log.info '    --run_all       Run all'
     log.info '    --svvcf2bed     Path to svvcf2bed program'
     log.info ''
