@@ -117,7 +117,7 @@ process run_manta {
 // 2. Run fermikit
 
 // Try to guess location of fastq file. If we can't find it create it
-// else put that in the fastqs channel.
+// else put that in the fastq channel.
 if (!params.fastq) {
     params.fastq = infer_fastq_from_bam()
 }
@@ -128,7 +128,7 @@ if (!params.fastq) {
             file 'bamfile' from bamfile
 
         output:
-            file 'fastq.fq.gz' into fastqs
+            file 'fastq.fq.gz' into fastq
 
         publishDir 'results'
 
@@ -150,12 +150,12 @@ if (!params.fastq) {
 }
 else {
     // The fastq file already exists, put it in the channel.
-    Channel.fromPath( params.fastq ).set { fastqs }
+    Channel.fromPath( params.fastq ).set { fastq }
 }
 
 process fermikit_calling {
     input:
-        file 'sample.fq.gz' from fastqs
+        file 'sample.fq.gz' from fastq
     output:
         file 'fermikit.vcf.gz'
         file 'fermikit.vcf'
