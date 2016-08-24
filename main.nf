@@ -26,16 +26,8 @@ if (! bamfile.exists()) {
     exit 1, "The bamfile, '$params.bam', does not exist"
 }
 
-svvcf2bed = params.svvcf2bed ? file(params.svvcf2bed)
-                             : find_svvcf2bed()
-
-if (!svvcf2bed.exists()) {
-    exit 1, "Can't find the svvcf2bed program, see --help for more information"
-}
-
 
 // 1. Run manta
-
 
 // Try to guess location of bamindex file. If we can't find it create it
 // else put that in the bamfile_index channel.
@@ -109,7 +101,7 @@ process run_manta {
     mv results/variants/diploidSV.vcf.gz ../manta.vcf.gz
     cd ..
     gunzip -c manta.vcf.gz > manta.vcf
-    $svvcf2bed manta.vcf > manta.bed
+    SVvcf2bed.pl manta.vcf > manta.bed
     """
 }
 
@@ -179,7 +171,7 @@ process fermikit_calling {
     bash calling.sh
     vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
     bgzip -c fermikit.vcf > fermikit.vcf.gz
-    $svvcf2bed fermikit.vcf > fermikit.bed
+    SVvcf2bed.pl fermikit.vcf > fermikit.bed
     """
 }
 
@@ -304,13 +296,7 @@ def usage_message() {
     log.info '    --run_manta     Run manta'
     log.info '    --run_fermikit  Run fermikit'
     log.info '    --run_all       Run all'
-    log.info '    --svvcf2bed     Path to svvcf2bed program'
     log.info ''
-}
-
-def find_svvcf2bed(path) {
-    return infer_filepath("$baseDir", /$/, '/SVvcf2bed.pl')
-        ?: infer_filepath("$workflow.launchDir", /$/, '/SVvcf2bed.pl')
 }
 
 def infer_bam_index_from_bam() {
