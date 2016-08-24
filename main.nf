@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 /*
-WGS Structural Variations Pipeline
+WGS Structural Variation Pipeline
 */
 
 // 0. Pre-flight checks
@@ -46,8 +46,16 @@ if (!bamindex) {
         publishDir 'results'
 
         // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
+        if ( nextflow_running_as_slurmjob() ) {
+            executor 'local'
+        }
+        else {
+            executor 'slurm'
+            queue "$params.runspecs.core"
+            time '30m'
+            clusterOptions = {
+                "-A $params.project $params.runspecs.extra"
+            }
         }
 
         when: params.run_manta == true
@@ -128,8 +136,16 @@ if (!params.fastq) {
         module "$params.modules.samtools"
 
         // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
+        if ( nextflow_running_as_slurmjob() ) {
+            executor 'local'
+        }
+        else {
+            executor 'slurm'
+            queue "$params.runspecs.core"
+            time '30m'
+            clusterOptions = {
+                "-A $params.project $params.runspecs.extra"
+            }
         }
 
         when: params.run_fermikit == true
@@ -313,6 +329,13 @@ def infer_filepath(from, match, replace) {
     path = file( from.replaceAll(match, replace) )
     if (path.exists()) {
         return path
+    }
+    return false
+}
+
+def nextflow_running_as_slurmjob() {
+    if ( System.getenv()["SLURM_JOB_ID"] ) {
+        return true
     }
     return false
 }
