@@ -50,8 +50,6 @@ if (!bamindex) {
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
-        publishDir params.outdir
-
         // We only need one core for this part
         if ( nextflow_running_as_slurmjob() ) {
             executor 'local'
@@ -80,11 +78,9 @@ process run_manta {
         file 'bamfile_tmp' from bamfile
         file 'bamfile.bai' from bamfile_index
     output:
-        file 'manta.vcf.gz'
-        file 'manta.vcf'
         file 'manta.bed' into manta_bed
 
-    publishDir params.outdir
+    publishDir params.outdir, mode: 'copy'
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -134,8 +130,6 @@ if (!params.fastq) {
         output:
             file 'fastq.fq.gz' into fastq
 
-        publishDir params.outdir
-
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
@@ -166,11 +160,9 @@ process fermikit_calling {
     input:
         file 'sample.fq.gz' from fastq
     output:
-        file 'fermikit.vcf.gz'
-        file 'fermikit.vcf'
         file 'fermikit.bed' into fermi_bed
 
-    publishDir params.outdir
+    publishDir params.outdir, mode: 'copy'
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -228,7 +220,7 @@ process mask_beds {
         file '*_masked.bed' into masked_beds
         file '*_masked_*.bed'
 
-    publishDir params.outdir
+    publishDir params.outdir, mode: 'copy'
 
     // Does not use many resources, run it locally
     executor 'local'
@@ -271,7 +263,7 @@ process intersect_files {
     output:
         file "combined*.bed"
 
-    publishDir params.outdir
+    publishDir params.outdir, mode: 'copy'
 
     // Does not use many resources, run it locally
     executor 'local'
