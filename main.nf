@@ -51,11 +51,8 @@ if (!bamindex) {
         }
         else {
             executor 'slurm'
-            queue "$params.runspecs.core"
-            time '30m'
-            clusterOptions = {
-                "-A $params.project $params.runspecs.extra"
-            }
+            queue 'core'
+            time params.short_job
         }
 
         when: params.run_manta == true
@@ -141,11 +138,8 @@ if (!params.fastq) {
         }
         else {
             executor 'slurm'
-            queue "$params.runspecs.core"
-            time '30m'
-            clusterOptions = {
-                "-A $params.project $params.runspecs.extra"
-            }
+            queue 'core'
+            time params.short_job
         }
 
         when: params.run_fermikit == true
@@ -309,9 +303,10 @@ def usage_message() {
     log.info '  Optional'
     log.info '    --help          Show this message and exit'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
-    log.info '    --run_manta     Run manta'
+    log.info '    --run_manta     Run manta (default)'
     log.info '    --run_fermikit  Run fermikit'
-    log.info '    --run_all       Run all'
+    log.info '    --run_all       Run all callers'
+    log.info '    --project       Uppmax project to log cluster time to'
     log.info ''
 }
 
