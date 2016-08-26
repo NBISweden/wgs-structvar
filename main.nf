@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 /*
-WGS Structural Variations Pipeline
+WGS Structural Variation Pipeline
 */
 
 // 0. Pre-flight checks
@@ -15,17 +15,24 @@ if (!params.bam) {
     exit 1, 'You need to specify a bam file, see --help for more information'
 }
 
-if (params.run_all) {
-    params.run_fermikit = true
-    params.run_manta = true
-}
-
 bamfile = file(params.bam)
 
 if (! bamfile.exists()) {
     exit 1, "The bamfile, '$params.bam', does not exist"
 }
 
+
+if (!params.project) {
+    exit 1, 'You need to specify what project to run under, see --help for more information'
+}
+
+if (params.run_all) {
+    params.run_fermikit = true
+    params.run_manta = true
+}
+
+
+startup_message()
 
 // 1. Run manta
 
@@ -43,11 +50,14 @@ if (!bamindex) {
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
-        publishDir 'results'
-
         // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
+        if ( nextflow_running_as_slurmjob() ) {
+            executor 'local'
+        }
+        else {
+            executor 'slurm'
+            queue 'core'
+            time params.short_job
         }
 
         when: params.run_manta == true
@@ -68,11 +78,9 @@ process run_manta {
         file 'bamfile_tmp' from bamfile
         file 'bamfile.bai' from bamfile_index
     output:
-        file 'manta.vcf.gz'
-        file 'manta.vcf'
         file 'manta.bed' into manta_bed
 
-    publishDir 'results'
+    publishDir params.outdir, mode: 'copy'
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -122,14 +130,17 @@ if (!params.fastq) {
         output:
             file 'fastq.fq.gz' into fastq
 
-        publishDir 'results'
-
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
         // We only need one core for this part
-        clusterOptions = {
-            "-A $params.project -p $params.runspecs.core $params.runspecs.extra"
+        if ( nextflow_running_as_slurmjob() ) {
+            executor 'local'
+        }
+        else {
+            executor 'slurm'
+            queue 'core'
+            time params.short_job
         }
 
         when: params.run_fermikit == true
@@ -149,11 +160,9 @@ process fermikit_calling {
     input:
         file 'sample.fq.gz' from fastq
     output:
-        file 'fermikit.vcf.gz'
-        file 'fermikit.vcf'
         file 'fermikit.bed' into fermi_bed
 
-    publishDir 'results'
+    publishDir params.outdir, mode: 'copy'
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -211,7 +220,7 @@ process mask_beds {
         file '*_masked.bed' into masked_beds
         file '*_masked_*.bed'
 
-    publishDir 'results'
+    publishDir params.outdir, mode: 'copy'
 
     // Does not use many resources, run it locally
     executor 'local'
@@ -254,7 +263,7 @@ process intersect_files {
     output:
         file "combined*.bed"
 
-    publishDir 'results'
+    publishDir params.outdir, mode: 'copy'
 
     // Does not use many resources, run it locally
     executor 'local'
@@ -290,13 +299,53 @@ def usage_message() {
     log.info 'Options:'
     log.info '  Required'
     log.info '    --bam           Input bamfile'
+    log.info '    --project       Uppmax project to log cluster time to'
     log.info '  Optional'
     log.info '    --help          Show this message and exit'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
-    log.info '    --run_manta     Run manta'
+    log.info '    --run_manta     Run manta (default)'
     log.info '    --run_fermikit  Run fermikit'
-    log.info '    --run_all       Run all'
+    log.info '    --run_all       Run all callers'
+    log.info '    --long_job      Running time for long job (callers, fermi and manta)'
+    log.info '    --short_job     Running time for short jobs (bam indexing and bam2fq)'
+    log.info '    --outdir        Directory where resultfiles are stored'
     log.info ''
+}
+
+def startup_message() {
+    revision = grab_git_revision()
+
+    log.info "======================"
+    log.info "WGS-structvar pipeline"
+    log.info "======================"
+    log.info "Bamfile    : $params.bam"
+    log.info "Scriptdir  : $baseDir"
+    log.info "Revision   : $revision"
+    log.info "Work dir   : $workDir"
+    log.info "Output dir : $params.outdir"
+    log.info "Project    : $params.project"
+    log.info ""
+}
+
+def grab_git_revision() {
+    if ( workflow.commitId ) { // it's run directly from github
+        return workflow.commitId
+    }
+
+    // Try to find the revision directly from git
+    head_pointer_file = file("${baseDir}/.git/HEAD")
+    if ( ! head_pointer_file.exists() ) {
+        return ''
+    }
+    ref = head_pointer_file.newReader().readLine().tokenize()[1]
+
+    ref_file = file("${baseDir}/.git/$ref")
+    if ( ! ref_file.exists() ) {
+        return ''
+    }
+    revision = ref_file.newReader().readLine()
+
+    return revision
 }
 
 def infer_bam_index_from_bam() {
@@ -313,6 +362,13 @@ def infer_filepath(from, match, replace) {
     path = file( from.replaceAll(match, replace) )
     if (path.exists()) {
         return path
+    }
+    return false
+}
+
+def nextflow_running_as_slurmjob() {
+    if ( System.getenv()["SLURM_JOB_ID"] ) {
+        return true
     }
     return false
 }
