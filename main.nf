@@ -79,6 +79,7 @@ process run_manta {
         file 'bamfile.bai' from bamfile_index
     output:
         file 'manta.bed' into manta_bed
+        file 'manta.vcf'
 
     publishDir params.outdir, mode: 'copy'
 
@@ -161,6 +162,7 @@ process fermikit_calling {
         file 'sample.fq.gz' from fastq
     output:
         file 'fermikit.bed' into fermi_bed
+        file 'fermikit.vcf'
 
     publishDir params.outdir, mode: 'copy'
 
