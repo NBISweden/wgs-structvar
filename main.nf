@@ -189,28 +189,12 @@ process fermikit_calling {
 
 
 // 3. Create summary files
-mask_urls = [
-    "https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed",
-    "https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz"
+mask_files = [
+    "$baseDir/data/ceph18.b37.lumpy.exclude.2014-01-15.bed",
+    "$baseDir/data/LCR-hs37d5.bed.gz"
 ]
 
-Channel.from( 0..<mask_urls.size() ).map { [it, mask_urls[it]] }.set { mask_urls_channel }
-
-process download_masks {
-    input:
-        set val(index), val(mask_url) from mask_urls_channel
-    output:
-        file 'mask_*.bed.gz' into masks
-
-    // Does not use many resources, run it locally
-    executor 'local'
-
-    """
-    wget -O mask_${index}.bed.gz $mask_url
-    """
-}
-
-
+masks = mask_files.collect { file(it) }.channel()
 // Collect both bed files and combine them with the mask files
 beds = manta_bed.mix( fermi_bed )
 beds.spread( masks.buffer(size: 2) ).set { mask_input }

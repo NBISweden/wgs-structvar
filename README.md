@@ -34,6 +34,13 @@ and manta on UPPMAX.
 You can choose to run either of the two structural variation callers or both
 (and generate summary files).
 
+### Masking
+
+The pipeline will use the following mask files to remove known artifacts:
+
+* From [cc2qe/speedseq](https://github.com/cc2qe/speedseq): https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed
+* From [lh3/varcmp](https://github.com/lh3/varcmp): https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz
+
 ## External links
 
 * [NextFlow website](http://www.nextflow.io)
