@@ -65,11 +65,12 @@ else {
     // The bamfile file already exists, put it in the channel.
     Channel.fromPath( bamindex ).set { bamfile_index }
 }
+bamfile_index.into{ bamfile_index_manta; bamfile_index_cnvnator }
 
 process manta {
     input:
         file 'bamfile' from bamfile
-        file 'bamfile.bai' from bamfile_index
+        file 'bamfile.bai' from bamfile_index_manta
     output:
         file 'manta.vcf' into manta_vcf
 
@@ -158,6 +159,35 @@ process fermikit {
     bash calling.sh
     vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
     bgzip -c fermikit.vcf > fermikit.vcf.gz
+    """
+}
+
+// CNVnator
+process cnvnator {
+    input:
+        file 'bamfile' from bamfile
+        file 'bamfile.bai' from bamfile_index_cnvnator
+    output:
+        file 'outfile.call'
+
+    publishDir params.outdir, mode: 'copy'
+
+    module 'bioinfo-tools'
+    module "$params.modules.cnvnator"
+
+    when: 'cnvnator' in workflowSteps
+
+    script:
+    """
+    ROOTFILE=out.root
+    CHROM=chr20
+    mkdir workdir
+    cd workdir
+    cnvnator -root \$ROOTFILE -chrom \$CHROM -unique -tree ../bamfile
+    cnvnator -root \$ROOTFILE -chrom \$CHROM -his 100 -d $params.ref_chrom
+    cnvnator -root \$ROOTFILE -chrom \$CHROM -stat 100
+    cnvnator -root \$ROOTFILE -chrom \$CHROM -partition 100
+    cnvnator -root \$ROOTFILE -chrom \$CHROM -call 100 > ../outfile.call
     """
 }
 
@@ -454,7 +484,7 @@ def processWorkflowSteps(steps) {
         exit 1, 'You can only run one annotator, either "vep" or "snpeff"'
     }
 
-    if ('manta' in workflowSteps) {
+    if ('manta' in workflowSteps || 'cnvnator' in workflowSteps) {
         workflowSteps.push( 'indexbam' )
     }
 
