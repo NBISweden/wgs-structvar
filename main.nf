@@ -79,7 +79,7 @@ process run_manta {
         file 'bamfile.bai' from bamfile_index
     output:
         file 'manta.bed' into manta_bed
-        file 'manta.vcf'
+        file 'manta.vcf' into manta_vcf
 
     publishDir params.outdir, mode: 'copy'
 
@@ -162,7 +162,7 @@ process fermikit_calling {
         file 'sample.fq.gz' from fastq
     output:
         file 'fermikit.bed' into fermi_bed
-        file 'fermikit.vcf'
+        file 'fermikit.vcf' into fermi_vcf
 
     publishDir params.outdir, mode: 'copy'
 
@@ -189,6 +189,12 @@ process fermikit_calling {
 
 
 // 3. Create summary files
+
+// Collect vcfs and beds into one channel
+beds = manta_bed.mix( fermi_bed )
+vcfs = manta_vcf.mix( fermi_vcf )
+
+
 mask_files = [
     "$baseDir/data/ceph18.b37.lumpy.exclude.2014-01-15.bed",
     "$baseDir/data/LCR-hs37d5.bed.gz"
@@ -196,7 +202,6 @@ mask_files = [
 
 masks = mask_files.collect { file(it) }.channel()
 // Collect both bed files and combine them with the mask files
-beds = manta_bed.mix( fermi_bed )
 beds.spread( masks.buffer(size: 2) ).set { mask_input }
 
 process mask_beds {
@@ -239,7 +244,8 @@ process mask_beds {
 // To make intersect files we need to combine them into one channel with
 // toList(). And also figure out if we have one or two files, therefore the
 // tap and count_beds.
-masked_beds.tap { count_beds_tmp }.toList().set { intersect_input }
+masked_beds.tap { count_beds_tmp }
+           .toList().set { intersect_input }
 count_beds_tmp.count().set { count_beds }
 
 process intersect_files {
