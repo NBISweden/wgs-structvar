@@ -245,6 +245,7 @@ process mask_beds {
 // toList(). And also figure out if we have one or two files, therefore the
 // tap and count_beds.
 masked_beds.tap { count_beds_tmp }
+           .tap { masked_beds_vep }
            .toList().set { intersect_input }
 count_beds_tmp.count().set { count_beds }
 
@@ -282,6 +283,71 @@ process intersect_files {
     set -e # Restore exit-settings
     """
 }
+
+
+vep_infiles = masked_beds_vep.mix(vcfs)
+
+// TODO: Figure out running characteristics
+process variant_effect_predictor {
+    input:
+        file infile from vep_infiles
+    output:
+        file '*.vep'
+
+    publishDir params.outdir, mode: 'copy'
+
+    // We only need one core for this part
+    if ( nextflow_running_as_slurmjob() ) {
+        executor 'local'
+    }
+    else {
+        executor 'slurm'
+        queue 'core'
+        time params.short_job
+    }
+
+    module 'bioinfo-tools'
+    module "$params.modules.vep"
+
+    script:
+    """
+    infile="$infile"
+    outfile="\$infile.vep"
+    vep_cache="/sw/data/uppnex/vep/84"
+    assembly="$params.vep.assembly"
+
+    case "\$infile" in
+        *vcf) format="vcf" ;;
+        *bed) format="ensembl" ;;
+        *)    printf "Unrecognized format for '%s'" "\$infile" >&2
+              exit 1;;
+    esac
+
+    variant_effect_predictor.pl \
+        -i "\$infile"               \
+        --format "\$format"        \
+        -cache --dir "\$vep_cache" \
+        -o "\$outfile"             \
+        --vcf                      \
+        --merged                   \
+        --regulatory               \
+        --force_overwrite          \
+        --sift b                   \
+        --polyphen b               \
+        --symbol                   \
+        --numbers                  \
+        --biotype                  \
+        --total_length             \
+        --canonical                \
+        --ccds                     \
+        --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
+        --assembly "\$assembly" \
+        --offline
+    """
+}
+
+
+// Utility functions
 
 def usage_message() {
     log.info ''
