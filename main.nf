@@ -73,7 +73,7 @@ else {
     Channel.fromPath( bamindex ).set { bamfile_index }
 }
 
-process run_manta {
+process manta {
     input:
         file 'bamfile_tmp' from bamfile
         file 'bamfile.bai' from bamfile_index
@@ -157,7 +157,7 @@ else {
     Channel.fromPath( params.fastq ).set { fastq }
 }
 
-process fermikit_calling {
+process fermikit {
     input:
         file 'sample.fq.gz' from fastq
     output:
