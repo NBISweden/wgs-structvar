@@ -51,14 +51,9 @@ if (!bamindex) {
         module "$params.modules.samtools"
 
         // We only need one core for this part
-        if ( nextflow_running_as_slurmjob() ) {
-            executor 'local'
-        }
-        else {
-            executor 'slurm'
-            queue 'core'
-            time params.short_job
-        }
+        executor choose_executor()
+        queue 'core'
+        time params.short_job
 
         when: params.run_manta == true
 
@@ -135,14 +130,9 @@ if (!params.fastq) {
         module "$params.modules.samtools"
 
         // We only need one core for this part
-        if ( nextflow_running_as_slurmjob() ) {
-            executor 'local'
-        }
-        else {
-            executor 'slurm'
-            queue 'core'
-            time params.short_job
-        }
+        executor choose_executor()
+        queue 'core'
+        time params.short_job
 
         when: params.run_fermikit == true
 
@@ -215,7 +205,9 @@ process mask_beds {
     publishDir params.outdir, mode: 'copy'
 
     // Does not use many resources, run it locally
-    executor 'local'
+    executor choose_executor()
+    queue 'core'
+    time params.short_job
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -260,7 +252,9 @@ process intersect_files {
     publishDir params.outdir, mode: 'copy'
 
     // Does not use many resources, run it locally
-    executor 'local'
+    executor choose_executor()
+    queue 'core'
+    time params.short_job
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -298,14 +292,9 @@ process variant_effect_predictor {
     publishDir params.outdir, mode: 'copy'
 
     // We only need one core for this part
-    if ( nextflow_running_as_slurmjob() ) {
-        executor 'local'
-    }
-    else {
-        executor 'slurm'
-        queue 'core'
-        time params.short_job
-    }
+    executor choose_executor()
+    queue 'core'
+    time params.short_job
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
@@ -361,7 +350,9 @@ process snpEff() {
     module "$params.modules.snpeff"
 
     // Does not use many resources, run it locally
-    executor 'local'
+    executor choose_executor()
+    queue 'core'
+    time params.short_job
 
     script:
     """
@@ -472,4 +463,8 @@ def nextflow_running_as_slurmjob() {
         return true
     }
     return false
+}
+
+def choose_executor() {
+    return nextflow_running_as_slurmjob() ? 'local' : 'slurm'
 }
