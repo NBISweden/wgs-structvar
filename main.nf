@@ -200,7 +200,6 @@ process mask_beds {
         set file(bedfile), file(mask1), file(mask2) from mask_input
     output:
         file '*_masked.bed' into masked_beds
-        file '*_masked_*.bed'
 
     publishDir params.outdir, mode: 'copy'
 
@@ -218,19 +217,6 @@ process mask_beds {
     cat $bedfile \
         | bedtools intersect -v -a stdin -b $mask1 -f 0.25 \
         | bedtools intersect -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
-
-
-    ## In case grep doesn't find anything it will exit with non-zero exit
-    ## status, which will cause slurm to abort the job, we want to continue on
-    ## error here.
-    set +e
-
-    ## Create filtered bed files
-    for WORD in DEL INS DUP; do
-        grep -w \$WORD \$MASK_FILE > \${BNAME}_masked_\${WORD,,}.bed
-    done
-
-    set -e # Restore exit-settings
     """
 }
 
