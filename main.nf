@@ -26,10 +26,8 @@ if (!params.project) {
     exit 1, 'You need to specify what project to run under, see --help for more information'
 }
 
-if (params.run_all) {
-    params.run_fermikit = true
-    params.run_manta = true
-}
+
+workflowSteps = processWorkflowSteps(params.steps)
 
 
 startup_message()
@@ -55,7 +53,7 @@ if (!bamindex) {
         queue 'core'
         time params.short_job
 
-        when: params.run_manta == true
+        when: 'indexbam' in workflowSteps
 
         script:
         """
@@ -81,7 +79,7 @@ process manta {
     module 'bioinfo-tools'
     module "$params.modules.manta"
 
-    when: params.run_manta == true
+    when: 'manta' in workflowSteps
 
     script:
     """
@@ -134,7 +132,7 @@ if (!params.fastq) {
         queue 'core'
         time params.short_job
 
-        when: params.run_fermikit == true
+        when: 'fastq' in workflowSteps
 
         script:
         """
@@ -162,7 +160,7 @@ process fermikit {
     module "$params.modules.vcftools"
     module "$params.modules.tabix"
 
-    when: params.run_fermikit == true
+    when: 'fermikit' in workflowSteps
 
     script:
     """
@@ -183,7 +181,6 @@ process fermikit {
 // Collect vcfs and beds into one channel
 beds = manta_bed.mix( fermi_bed )
 vcfs = manta_vcf.mix( fermi_vcf )
-                .tap { vcfs_snpeff }
 
 
 mask_files = [
@@ -220,11 +217,12 @@ process mask_beds {
     """
 }
 
+
 // To make intersect files we need to combine them into one channel with
 // toList(). And also figure out if we have one or two files, therefore the
 // tap and count_beds.
 masked_beds.tap { count_beds_tmp }
-           .tap { masked_beds_vep }
+           .tap { masked_beds }
            .toList().set { intersect_input }
 count_beds_tmp.count().set { count_beds }
 
@@ -233,7 +231,7 @@ process intersect_files {
         set file(bed1), file(bed2) from intersect_input
         val nbeds from count_beds
     output:
-        file "combined*.bed"
+        file "combined*.bed" into intersections
 
     publishDir params.outdir, mode: 'copy'
 
@@ -265,25 +263,24 @@ process intersect_files {
     """
 }
 
+annotate_files = intersections.flatten().mix( masked_beds.tap { masked_beds } )
 
-vep_infiles = masked_beds_vep.mix(vcfs)
-
-// TODO: Figure out running characteristics
 process variant_effect_predictor {
     input:
-        file infile from vep_infiles
+        file infile from annotate_files.tap { annotate_files }
     output:
-        file '*.vep'
+        file '*.vep' into vep_outfiles
 
     publishDir params.outdir, mode: 'copy'
 
-    // We only need one core for this part
     executor choose_executor()
     queue 'core'
     time params.short_job
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
+
+    when: 'vep' in workflowSteps
 
     script:
     """
@@ -300,7 +297,7 @@ process variant_effect_predictor {
     esac
 
     variant_effect_predictor.pl \
-        -i "\$infile"               \
+        -i "\$infile"              \
         --format "\$format"        \
         -cache --dir "\$vep_cache" \
         -o "\$outfile"             \
@@ -322,7 +319,6 @@ process variant_effect_predictor {
     """
 }
 
-
 process snpEff() {
     input:
         file vcf from vcfs_snpeff
@@ -339,6 +335,8 @@ process snpEff() {
     executor choose_executor()
     queue 'core'
     time params.short_job
+
+    when: 'snpeff' in workflowSteps
 
     script:
     """
@@ -381,9 +379,9 @@ def usage_message() {
     log.info '  Optional'
     log.info '    --help          Show this message and exit'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
-    log.info '    --run_manta     Run manta (default)'
-    log.info '    --run_fermikit  Run fermikit'
-    log.info '    --run_all       Run all callers'
+    log.info '    --steps         Specify what steps to run, comma separated:'
+    log.info '                Callers: manta, fermikit, cnvnator (choose one or many)'
+    log.info '                Annotation: vep OR snpeff'
     log.info '    --long_job      Running time for long job (callers, fermi and manta)'
     log.info '    --short_job     Running time for short jobs (bam indexing and bam2fq)'
     log.info '    --outdir        Directory where resultfiles are stored'
@@ -402,6 +400,7 @@ def startup_message() {
     log.info "Work dir   : $workDir"
     log.info "Output dir : $params.outdir"
     log.info "Project    : $params.project"
+    log.info "Will run   : " + workflowSteps.join(", ")
     log.info ""
 }
 
@@ -453,4 +452,26 @@ def nextflow_running_as_slurmjob() {
 
 def choose_executor() {
     return nextflow_running_as_slurmjob() ? 'local' : 'slurm'
+}
+
+def processWorkflowSteps(steps) {
+    if ( ! steps ) {
+        return []
+    }
+
+    workflowSteps = steps.split(',').collect { it.trim().toLowerCase() }
+
+    if ('vep' in workflowSteps && 'snpeff' in workflowSteps) {
+        exit 1, 'You can only run one annotator, either "vep" or "snpeff"'
+    }
+
+    if ('manta' in workflowSteps) {
+        workflowSteps.push( 'indexbam' )
+    }
+
+    if ('fermikit' in workflowSteps) {
+        workflowSteps.push( 'fastq' )
+    }
+
+    return workflowSteps
 }
