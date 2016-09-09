@@ -193,6 +193,7 @@ process fermikit {
 // Collect vcfs and beds into one channel
 beds = manta_bed.mix( fermi_bed )
 vcfs = manta_vcf.mix( fermi_vcf )
+                .tap { vcfs_snpeff }
 
 
 mask_files = [
@@ -343,6 +344,48 @@ process variant_effect_predictor {
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$assembly" \
         --offline
+    """
+}
+
+
+process snpEff() {
+    input:
+        file vcf from vcfs_snpeff
+    output:
+        file '*snpeff_genes.txt'
+        file '*.snpeff'
+
+    publishDir params.outdir, mode: 'copy'
+
+    module 'bioinfo-tools'
+    module "$params.modules.snpeff"
+
+    // Does not use many resources, run it locally
+    executor 'local'
+
+    script:
+    """
+    vcf="$vcf" ## Use bash-semantics for variables
+    snpeffjar=''
+
+    for p in \$( tr ':' ' ' <<<"\$CLASSPATH" ); do
+        if [ -f "\$p/snpEff.jar" ]; then
+            snpeffjar="\$p/snpEff.jar"
+            break
+        fi
+    done
+    if [ -z "\$snpeffjar" ]; then
+        printf "Can't find snpEff.jar in '%s'" "\$CLASSPATH" >&2
+        exit 1
+    fi
+
+    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$vcf" \
+        | vt decompose -s - \
+        | vt normalize -r $params.ref_fasta - \
+        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic GRCh37.75 \
+        > "\$vcf.snpeff"
+
+    cp snpEff_genes.txt "\$vcf.snpeff_genes.txt"
     """
 }
 
