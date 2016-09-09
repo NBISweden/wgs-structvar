@@ -1,0 +1,46 @@
+digraph {
+    { node [shape=box];
+        tiddit_out;
+        cnvnator_out;
+        manta_vcf;
+        manta_bed;
+        fermi_vcf;
+        fermi_bed;
+        manta_masked;
+        fermi_masked;
+        manta_snpEff;
+        fermi_snpEff;
+        manta_vep;
+        fermi_vep;
+        intersect_DEL;
+        intersect_DUP;
+        intersect_INS;
+        tiddit_masked;
+        cnvnator_masked;
+        tiddit_vep;
+        cnvnator_vep
+        tiddit_snpEff
+        cnvnator_snpEff
+    }
+
+    bamfile -> manta -> manta_vcf -> manta_bed;
+    bamfile -> fermikit -> fermi_vcf -> fermi_bed;
+    bamfile -> tiddit -> tiddit_out
+    bamfile -> CNVnator -> cnvnator_out
+
+    { manta_bed; fermi_bed; tiddit_out; cnvnator_out } -> mask
+        -> { manta_masked; fermi_masked; tiddit_masked; cnvnator_masked };
+
+    { manta_masked; fermi_masked } -> intersection;
+    intersection -> { intersect_DEL; intersect_INS; intersect_DUP };
+
+    {manta_masked; fermi_masked; tiddit_masked; cnvnator_masked} -> snpEff
+        -> { manta_snpEff; fermi_snpEff; tiddit_snpEff; cnvnator_snpEff };
+    {manta_masked; fermi_masked; tiddit_masked; cnvnator_masked} -> vep 
+        -> { manta_vep; fermi_vep; tiddit_vep; cnvnator_vep };
+
+    { rank = same; manta; fermikit; tiddit; CNVnator }
+    { rank = same; manta_bed; fermi_bed; manta_vcf; fermi_vcf }
+    { rank = same; intersect_DUP; intersect_INS; intersect_DEL; vep }
+    { rank = same; manta_vep; fermi_vep; tiddit_vep; cnvnator_vep; snpEff }
+}
