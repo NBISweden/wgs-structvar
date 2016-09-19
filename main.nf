@@ -79,24 +79,16 @@ process manta {
     module 'bioinfo-tools'
     module "$params.modules.manta"
 
+    errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
+    time { params.long_job * 2**task.attempt }
+    maxRetries 3
+    queue 'core'
+    cpus 4
+
     when: 'manta' in workflowSteps
 
     script:
     """
-    # Manta follows symlinks and expects the index to be with the original
-    # file, so we copy it, and then clean up at script EXIT with a trap.
-    # TODO, this is fixed in manta v0.29.5, https://github.com/Illumina/manta/issues/32
-    DIR=`pwd`
-    function cleanup() {
-        echo "CLEAN UP"
-        cd \$DIR
-        if [ -f bamfile ]; then
-            rm bamfile
-        fi
-    }
-    trap cleanup EXIT
-    cp bamfile_tmp bamfile
-
     configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
     cd testRun
     ./runWorkflow.py -m local -j $params.threads
