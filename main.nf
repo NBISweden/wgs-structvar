@@ -68,10 +68,9 @@ else {
 
 process manta {
     input:
-        file 'bamfile_tmp' from bamfile
+        file 'bamfile' from bamfile
         file 'bamfile.bai' from bamfile_index
     output:
-        file 'manta.bed' into manta_bed
         file 'manta.vcf' into manta_vcf
 
     publishDir params.outdir, mode: 'copy'
@@ -80,7 +79,7 @@ process manta {
     module "$params.modules.manta"
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.long_job * 2**task.attempt }
+    time { params.long_job * 2**(task.attempt-1) }
     maxRetries 3
     queue 'core'
     cpus 4
@@ -95,7 +94,6 @@ process manta {
     mv results/variants/diploidSV.vcf.gz ../manta.vcf.gz
     cd ..
     gunzip -c manta.vcf.gz > manta.vcf
-    SVvcf2bed.pl manta.vcf > manta.bed
     """
 }
 
@@ -112,7 +110,6 @@ if (!params.fastq) {
     process create_fastq {
         input:
             file 'bamfile' from bamfile
-
         output:
             file 'fastq.fq.gz' into fastq
 
@@ -141,7 +138,6 @@ process fermikit {
     input:
         file 'sample.fq.gz' from fastq
     output:
-        file 'fermikit.bed' into fermi_bed
         file 'fermikit.vcf' into fermi_vcf
 
     publishDir params.outdir, mode: 'copy'
@@ -162,18 +158,14 @@ process fermikit {
     bash calling.sh
     vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
     bgzip -c fermikit.vcf > fermikit.vcf.gz
-    SVvcf2bed.pl fermikit.vcf > fermikit.bed
     """
 }
-
 
 
 // 3. Create summary files
 
 // Collect vcfs and beds into one channel
-beds = manta_bed.mix( fermi_bed )
 vcfs = manta_vcf.mix( fermi_vcf )
-
 
 mask_files = [
     "$baseDir/data/ceph18.b37.lumpy.exclude.2014-01-15.bed",
@@ -182,13 +174,13 @@ mask_files = [
 
 masks = mask_files.collect { file(it) }.channel()
 // Collect both bed files and combine them with the mask files
-beds.spread( masks.buffer(size: 2) ).set { mask_input }
+vcfs.tap { vcfs }.spread( masks.buffer(size: 2) ).set { mask_input }
 
 process mask_beds {
     input:
-        set file(bedfile), file(mask1), file(mask2) from mask_input
+        set file(svfile), file(mask1), file(mask2) from mask_input
     output:
-        file '*_masked.bed' into masked_beds
+        file '*_masked.vcf' into masked_vcfs
 
     publishDir params.outdir, mode: 'copy'
 
@@ -201,29 +193,30 @@ process mask_beds {
     module "$params.modules.bedtools"
 
     """
-    BNAME=\$( echo $bedfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.bed
-    cat $bedfile \
-        | bedtools intersect -v -a stdin -b $mask1 -f 0.25 \
-        | bedtools intersect -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
+    BNAME=\$( echo $svfile | cut -d. -f1 )
+    MASK_FILE=\${BNAME}_masked.vcf
+    cat $svfile \
+        | bedtools intersect -header -v -a stdin -b $mask1 -f 0.25 \
+        | bedtools intersect -header -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
     """
 }
 
 
 // To make intersect files we need to combine them into one channel with
-// toList(). And also figure out if we have one or two files, therefore the
-// tap and count_beds.
-masked_beds.tap { count_beds_tmp }
-           .tap { masked_beds }
-           .toList().set { intersect_input }
-count_beds_tmp.count().set { count_beds }
+// toSortedList() (fermi is before manta in alphabet). And also figure out if we
+// have one or two files, therefore the tap and count_vcfs.
+masked_vcfs.tap { count_vcfs_tmp }
+           .tap { masked_vcfs }
+           .toSortedList().set { intersect_input }
+count_vcfs_tmp.count().set { count_vcfs }
 
 process intersect_files {
     input:
-        set file(bed1), file(bed2) from intersect_input
-        val nbeds from count_beds
+        set file(fermi_vcf), file(manta_vcf) from intersect_input
+        val nvcfs from count_vcfs
     output:
-        file "combined_masked.bed" into intersections
+        file "combined_masked.vcf" into intersections
+        file "combined_masked*.vcf"
 
     publishDir params.outdir, mode: 'copy'
 
@@ -235,33 +228,28 @@ process intersect_files {
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
 
-    when: nbeds == 2
+    when: nvcfs == 2
 
     script:
     """
-    ## In case grep doesn't find anything it will exit with non-zero exit
-    ## status, which will cause slurm to abort the job, we want to continue on
-    ## error here.
-    set +e
-
-    ## Create intersected bed files
+    ## Create intersected vcf files
     for WORD in DEL INS DUP; do
-        intersectBed -a <( grep -w \$WORD $bed1 ) -b <( grep -w \$WORD $bed2 ) \
+        intersectBed -a <( grep -w "^#.\\+\\|\$WORD" $fermi_vcf) \
+                     -b <( grep -w "^#.\\+\\|\$WORD" $manta_vcf) \
             -f 0.5 -r \
-            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.bed
+            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.vcf
     done
 
-    cat <( grep -v -w 'DEL\\|INS\\|DUP' $bed1 ) \
-        <( grep -v -w 'DEL\\|INS\\|DUP' $bed2 ) \
-        | sort -k1,1V -k2,2n > combined_masked_OTHER.bed
+    cat <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' $fermi_vcf ) \
+        <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' $manta_vcf ) \
+        | cut -f 1-8 \
+        | sort -k1,1V -k2,2n > combined_masked_OTHER.vcf
 
-    sort -k1,1V -k2,2n combined_masked_*.bed >> combined_masked.bed
-
-    set -e # Restore exit-settings
+    sort -k1,1V -k2,2n combined_masked_*.vcf >> combined_masked.vcf
     """
 }
 
-annotate_files = intersections.flatten().mix( masked_beds.tap { masked_beds } )
+annotate_files = intersections.flatten().mix( masked_vcfs.tap { masked_vcfs } )
 
 process variant_effect_predictor {
     input:
@@ -294,6 +282,12 @@ process variant_effect_predictor {
               exit 1;;
     esac
 
+    ## If the input file is empty, just copy
+    if [ \$( wc -l "\$infile" | awk '{print \$1}' ) -eq 0 ]; then
+        cp "\$infile" "\$outfile"
+        exit
+    fi
+
     variant_effect_predictor.pl \
         -i "\$infile"              \
         --format "\$format"        \
@@ -317,11 +311,10 @@ process variant_effect_predictor {
     """
 }
 
-process snpEff() {
+process snpEff {
     input:
-        file vcf from vcfs_snpeff
+        file vcf from annotate_files.tap { annotate_files }
     output:
-        file '*snpeff_genes.txt'
         file '*.snpeff'
 
     publishDir params.outdir, mode: 'copy'
@@ -355,10 +348,8 @@ process snpEff() {
     sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$vcf" \
         | vt decompose -s - \
         | vt normalize -r $params.ref_fasta - \
-        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic GRCh37.75 \
+        | java -Xmx7G -jar "\$snpeffjar" -formatEff -classic GRCh37.75 \
         > "\$vcf.snpeff"
-
-    cp snpEff_genes.txt "\$vcf.snpeff_genes.txt"
     """
 }
 
