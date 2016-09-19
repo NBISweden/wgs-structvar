@@ -231,7 +231,7 @@ process intersect_files {
         set file(bed1), file(bed2) from intersect_input
         val nbeds from count_beds
     output:
-        file "combined*.bed" into intersections
+        file "combined_masked.bed" into intersections
 
     publishDir params.outdir, mode: 'copy'
 
@@ -258,6 +258,12 @@ process intersect_files {
             -f 0.5 -r \
             | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.bed
     done
+
+    cat <( grep -v -w 'DEL\\|INS\\|DUP' $bed1 ) \
+        <( grep -v -w 'DEL\\|INS\\|DUP' $bed2 ) \
+        | sort -k1,1V -k2,2n > combined_masked_OTHER.bed
+
+    sort -k1,1V -k2,2n combined_masked_*.bed >> combined_masked.bed
 
     set -e # Restore exit-settings
     """
