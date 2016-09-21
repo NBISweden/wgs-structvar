@@ -1,1 +1,4 @@
 .nextflow.*
+results*
+slurm-*
+CEP-1-7*
