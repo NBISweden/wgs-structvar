@@ -37,8 +37,7 @@ startup_message()
 // Try to guess location of bamindex file. If we can't find it create it
 // else put that in the bamfile_index channel.
 
-bamindex = infer_bam_index_from_bam()
-if (!bamindex) {
+if ('indexbam' in workflowSteps) {
     process index_bamfile {
         input:
             file 'bamfile' from bamfile
@@ -62,15 +61,14 @@ if (!bamindex) {
     }
 }
 else {
-    // The bamfile file already exists, put it in the channel.
+    bamindex = infer_bam_index_from_bam()
     Channel.fromPath( bamindex ).set { bamfile_index }
 }
-bamfile_index.into{ bamfile_index_manta; bamfile_index_cnvnator }
 
 process manta {
     input:
         file 'bamfile' from bamfile
-        file 'bamfile.bai' from bamfile_index_manta
+        file 'bamfile.bai' from bamfile_index.tap { bamfile_index }
     output:
         file 'manta.vcf' into manta_vcf
 
@@ -165,29 +163,68 @@ process fermikit {
 // CNVnator
 process cnvnator {
     input:
-        file 'bamfile' from bamfile
-        file 'bamfile.bai' from bamfile_index_cnvnator
+        file 'file.bam' from bamfile
+        file 'file.bam.bai' from bamfile_index.tap { bamfile_index }
     output:
-        file 'outfile.call'
+        file 'cnvnator.vcf' into cnvnator_vcf
 
     publishDir params.outdir, mode: 'copy'
 
     module 'bioinfo-tools'
     module "$params.modules.cnvnator"
 
+    queue 'devel'
+    //cpus 4
+
     when: 'cnvnator' in workflowSteps
 
     script:
     """
-    ROOTFILE=out.root
-    CHROM=chr20
-    mkdir workdir
-    cd workdir
-    cnvnator -root \$ROOTFILE -chrom \$CHROM -unique -tree ../bamfile
-    cnvnator -root \$ROOTFILE -chrom \$CHROM -his 100 -d $params.ref_chrom
-    cnvnator -root \$ROOTFILE -chrom \$CHROM -stat 100
-    cnvnator -root \$ROOTFILE -chrom \$CHROM -partition 100
-    cnvnator -root \$ROOTFILE -chrom \$CHROM -call 100 > ../outfile.call
+    resource_usage.pl &
+    tokill=\$?
+
+    ## Link all fasta chromosomes
+    mkdir fasta
+    for file in $params.ref_chrom/*.{??,?}.fa; do
+        chr=\$( echo \$file | awk -F'.' '{ print \$(NF - 1) }' );
+        ln -s \$file fasta/\$chr.fa
+    done
+
+
+    rootfile=out.root
+    #chrom="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y"
+    chrom="20"
+    binsize=500
+
+    #cnvnator -root \$rootfile -chrom \$chrom -unique -tree file.bam
+    #cnvnator -root \$rootfile -chrom \$chrom -his \$binsize -d fasta
+    #cnvnator -root \$rootfile -chrom \$chrom -stat \$binsize
+    #cnvnator -root \$rootfile -chrom \$chrom -partition \$binsize
+    #cnvnator -root \$rootfile -chrom \$chrom -call \$binsize > outfile.call
+    echo -ne "TIMED 1 "
+    date +%Y-%m-%dT%H:%M:%S
+    cnvnator -root \$rootfile -chrom \$chrom -unique -tree file.bam
+    echo -ne "TIMED 2 "
+    date +%Y-%m-%dT%H:%M:%S
+    cnvnator -root \$rootfile -chrom \$chrom -his \$binsize -d fasta
+    echo -ne "TIMED 3 "
+    date +%Y-%m-%dT%H:%M:%S
+    cnvnator -root \$rootfile -chrom \$chrom -stat \$binsize
+    echo -ne "TIMED 4 "
+    date +%Y-%m-%dT%H:%M:%S
+    cnvnator -root \$rootfile -chrom \$chrom -partition \$binsize
+    echo -ne "TIMED 5 "
+    date +%Y-%m-%dT%H:%M:%S
+    cnvnator -root \$rootfile -chrom \$chrom -call \$binsize > outfile.call
+    echo -ne "TIMED 6 "
+    date +%Y-%m-%dT%H:%M:%S
+    cnvnator2VCF.pl outfile.call fasta > cnvnator.vcf
+    echo -ne "TIMED 7 "
+    date +%Y-%m-%dT%H:%M:%S
+
+    kill -15 \$tokill || true
+    echo -ne "TIMED 8 "
+    date +%Y-%m-%dT%H:%M:%S
     """
 }
 
@@ -195,7 +232,7 @@ process cnvnator {
 // 3. Create summary files
 
 // Collect vcfs and beds into one channel
-vcfs = manta_vcf.mix( fermi_vcf )
+vcfs = manta_vcf.mix( fermi_vcf, cnvnator_vcf )
 
 mask_files = [
     "$baseDir/data/ceph18.b37.lumpy.exclude.2014-01-15.bed",
@@ -216,7 +253,7 @@ process mask_beds {
 
     // Does not use many resources, run it locally
     executor choose_executor()
-    queue 'core'
+    queue 'devcore'
     time params.short_job
 
     module 'bioinfo-tools'
@@ -485,7 +522,10 @@ def processWorkflowSteps(steps) {
     }
 
     if ('manta' in workflowSteps || 'cnvnator' in workflowSteps) {
-        workflowSteps.push( 'indexbam' )
+        bamindex = infer_bam_index_from_bam()
+        if ( !bamindex ) {
+            workflowSteps.push( 'indexbam' )
+        }
     }
 
     if ('fermikit' in workflowSteps) {
