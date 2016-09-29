@@ -48,10 +48,9 @@ if (!bamindex) {
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
-        // We only need one core for this part
         executor choose_executor()
         queue 'core'
-        time params.short_job
+        time params.runtime.simple
 
         when: 'indexbam' in workflowSteps
 
@@ -79,7 +78,7 @@ process manta {
     module "$params.modules.manta"
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.long_job * 2**(task.attempt-1) }
+    time { params.runtime.caller * 2**(task.attempt-1) }
     maxRetries 3
     queue 'core'
     cpus 4
@@ -116,10 +115,9 @@ if (!params.fastq) {
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
-        // We only need one core for this part
         executor choose_executor()
         queue 'core'
-        time params.short_job
+        time params.runtime.simple
 
         when: 'fastq' in workflowSteps
 
@@ -141,6 +139,11 @@ process fermikit {
         file 'fermikit.vcf' into fermi_vcf
 
     publishDir params.outdir, mode: 'copy'
+
+    errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
+    time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
+    maxRetries 3
+    queue 'node'
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -184,10 +187,9 @@ process mask_beds {
 
     publishDir params.outdir, mode: 'copy'
 
-    // Does not use many resources, run it locally
     executor choose_executor()
     queue 'core'
-    time params.short_job
+    time params.runtime.simple
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -220,10 +222,9 @@ process intersect_files {
 
     publishDir params.outdir, mode: 'copy'
 
-    // Does not use many resources, run it locally
     executor choose_executor()
     queue 'core'
-    time params.short_job
+    time params.runtime.simple
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -261,7 +262,7 @@ process variant_effect_predictor {
 
     executor choose_executor()
     queue 'core'
-    time params.short_job
+    time params.runtime.simple
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
@@ -322,10 +323,9 @@ process snpEff {
     module 'bioinfo-tools'
     module "$params.modules.snpeff"
 
-    // Does not use many resources, run it locally
     executor choose_executor()
     queue 'core'
-    time params.short_job
+    time params.runtime.simple
 
     when: 'snpeff' in workflowSteps
 
@@ -371,8 +371,6 @@ def usage_message() {
     log.info '    --steps         Specify what steps to run, comma separated:'
     log.info '                Callers: manta, fermikit, cnvnator (choose one or many)'
     log.info '                Annotation: vep OR snpeff'
-    log.info '    --long_job      Running time for long job (callers, fermi and manta)'
-    log.info '    --short_job     Running time for short jobs (bam indexing and bam2fq)'
     log.info '    --outdir        Directory where resultfiles are stored'
     log.info ''
 }
@@ -439,6 +437,8 @@ def nextflow_running_as_slurmjob() {
     return false
 }
 
+/* If the nextflow deamon is running as a slurm job, we can use the local CPU
+ * for a lot of our work */
 def choose_executor() {
     return nextflow_running_as_slurmjob() ? 'local' : 'slurm'
 }
