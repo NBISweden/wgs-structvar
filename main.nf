@@ -45,12 +45,12 @@ if (!bamindex) {
         output:
             file 'bamfile.bai' into bamfile_index
 
-        module 'bioinfo-tools'
-        module "$params.modules.samtools"
-
         executor choose_executor()
         queue 'core'
         time params.runtime.simple
+
+        module 'bioinfo-tools'
+        module "$params.modules.samtools"
 
         when: 'indexbam' in workflowSteps
 
@@ -74,14 +74,14 @@ process manta {
 
     publishDir params.outdir, mode: 'copy'
 
-    module 'bioinfo-tools'
-    module "$params.modules.manta"
-
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.caller * 2**(task.attempt-1) }
     maxRetries 3
     queue 'core'
     cpus 4
+
+    module 'bioinfo-tools'
+    module "$params.modules.manta"
 
     when: 'manta' in workflowSteps
 
@@ -112,12 +112,12 @@ if (!params.fastq) {
         output:
             file 'fastq.fq.gz' into fastq
 
-        module 'bioinfo-tools'
-        module "$params.modules.samtools"
-
         executor choose_executor()
         queue 'core'
         time params.runtime.simple
+
+        module 'bioinfo-tools'
+        module "$params.modules.samtools"
 
         when: 'fastq' in workflowSteps
 
@@ -320,12 +320,12 @@ process snpEff {
 
     publishDir params.outdir, mode: 'copy'
 
-    module 'bioinfo-tools'
-    module "$params.modules.snpeff"
-
     executor choose_executor()
     queue 'core'
     time params.runtime.simple
+
+    module 'bioinfo-tools'
+    module "$params.modules.snpeff"
 
     when: 'snpeff' in workflowSteps
 
