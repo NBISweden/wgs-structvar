@@ -185,8 +185,6 @@ process mask_beds {
     output:
         file '*_masked.vcf' into masked_vcfs
 
-    publishDir params.outdir, mode: 'copy'
-
     executor choose_executor()
     queue 'core'
     time params.runtime.simple
@@ -218,9 +216,6 @@ process intersect_files {
         val nvcfs from count_vcfs
     output:
         file "combined_masked.vcf" into intersections
-        file "combined_masked*.vcf"
-
-    publishDir params.outdir, mode: 'copy'
 
     executor choose_executor()
     queue 'core'
@@ -256,7 +251,7 @@ process variant_effect_predictor {
     input:
         file infile from annotate_files.tap { annotate_files }
     output:
-        file '*.vep' into vep_outfiles
+        file '*.vep.vcf'
 
     publishDir params.outdir, mode: 'copy'
 
@@ -316,7 +311,7 @@ process snpEff {
     input:
         file vcf from annotate_files.tap { annotate_files }
     output:
-        file '*.snpeff'
+        file '*.snpeff.vcf'
 
     publishDir params.outdir, mode: 'copy'
 
