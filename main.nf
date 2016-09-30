@@ -266,28 +266,28 @@ process variant_effect_predictor {
 
     script:
     """
-    infile="$infile"
-    outfile="\$infile.vep"
-    vep_cache="/sw/data/uppnex/vep/84"
-    assembly="$params.vep.assembly"
+    INFILE="$infile"
+    OUTFILE="\${INFILE%.vcf}.vep.vcf"
+    VEP_CACHE="/sw/data/uppnex/vep/84"
+    ASSEMBLY="GRCh37"
 
-    case "\$infile" in
-        *vcf) format="vcf" ;;
-        *bed) format="ensembl" ;;
-        *)    printf "Unrecognized format for '%s'" "\$infile" >&2
+    case "\$INFILE" in
+        *vcf) FORMAT="vcf" ;;
+        *bed) FORMAT="ensembl" ;;
+        *)    printf "Unrecognized format for '%s'" "\$INFILE" >&2
               exit 1;;
     esac
 
-    ## If the input file is empty, just copy
-    if [ \$( wc -l "\$infile" | awk '{print \$1}' ) -eq 0 ]; then
-        cp "\$infile" "\$outfile"
+    ## If the input file is empty, just copy it
+    if [[ -f "\$INFILE" && -s "\$INFILE" ]]; then
+        cp "\$INFILE" "\$OUTFILE"
         exit
     fi
 
     variant_effect_predictor.pl \
         -i "\$infile"              \
-        --format "\$format"        \
-        -cache --dir "\$vep_cache" \
+        --format "\$FORMAT"        \
+        -cache --dir "\$VEP_CACHE" \
         -o "\$outfile"             \
         --vcf                      \
         --merged                   \
@@ -302,14 +302,14 @@ process variant_effect_predictor {
         --canonical                \
         --ccds                     \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
-        --assembly "\$assembly" \
+        --assembly "\$ASSEMBLY" \
         --offline
     """
 }
 
 process snpEff {
     input:
-        file vcf from annotate_files.tap { annotate_files }
+        file infile from annotate_files.tap { annotate_files }
     output:
         file '*.snpeff.vcf'
 
@@ -326,25 +326,26 @@ process snpEff {
 
     script:
     """
-    vcf="$vcf" ## Use bash-semantics for variables
-    snpeffjar=''
+    INFILE="$infile" ## Use bash-semantics for variables
+    OUTFILE="\${INFILE%.vcf}.snpeff.vcf"
+    SNPEFFJAR=''
 
-    for p in \$( tr ':' ' ' <<<"\$CLASSPATH" ); do
-        if [ -f "\$p/snpEff.jar" ]; then
-            snpeffjar="\$p/snpEff.jar"
+    for P in \$( tr ':' ' ' <<<"\$CLASSPATH" ); do
+        if [ -f "\$P/snpEff.jar" ]; then
+            SNPEFFJAR="\$P/snpEff.jar"
             break
         fi
     done
-    if [ -z "\$snpeffjar" ]; then
+    if [ -z "\$SNPEFFJAR" ]; then
         printf "Can't find snpEff.jar in '%s'" "\$CLASSPATH" >&2
         exit 1
     fi
 
-    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$vcf" \
+    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
         | vt decompose -s - \
         | vt normalize -r $params.ref_fasta - \
-        | java -Xmx7G -jar "\$snpeffjar" -formatEff -classic GRCh37.75 \
-        > "\$vcf.snpeff"
+        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic GRCh37.75 \
+        > "\$OUTFILE"
     """
 }
 
