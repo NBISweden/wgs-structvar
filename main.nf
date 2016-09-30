@@ -203,17 +203,14 @@ process mask_beds {
 
 
 // To make intersect files we need to combine them into one channel with
-// toSortedList() (fermi is before manta in alphabet). And also figure out if we
-// have one or two files, therefore the tap and count_vcfs.
-masked_vcfs.tap { count_vcfs_tmp }
-           .tap { masked_vcfs }
+// toSortedList() (fermi is before manta in alphabet).
+masked_vcfs.tap { masked_vcfs }
+           .filter( ~/manta|fermikit/ )
            .toSortedList().set { intersect_input }
-count_vcfs_tmp.count().set { count_vcfs }
 
 process intersect_files {
     input:
         set file(fermi_vcf), file(manta_vcf) from intersect_input
-        val nvcfs from count_vcfs
     output:
         file "combined_masked.vcf" into intersections
 
@@ -224,7 +221,7 @@ process intersect_files {
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
 
-    when: nvcfs == 2
+    when: 'make_intersect' in workflowSteps
 
     script:
     """
@@ -456,6 +453,10 @@ def processWorkflowSteps(steps) {
 
     if ('fermikit' in workflowSteps) {
         workflowSteps.push( 'fastq' )
+    }
+
+    if ('manta' in workflowSteps && 'fermikit' in workflowSteps) {
+        workflowSteps.push( 'make_intersect' )
     }
 
     return workflowSteps
