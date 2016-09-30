@@ -362,7 +362,7 @@ def usage_message() {
     log.info '    --help          Show this message and exit'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '    --steps         Specify what steps to run, comma separated:'
-    log.info '                Callers: manta, fermikit, cnvnator (choose one or many)'
+    log.info '                Callers: manta, fermikit (choose one or many)'
     log.info '                Annotation: vep OR snpeff'
     log.info '    --outdir        Directory where resultfiles are stored'
     log.info ''
