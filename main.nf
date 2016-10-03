@@ -72,7 +72,7 @@ process manta {
     output:
         file 'manta.vcf' into manta_vcf
 
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.caller * 2**(task.attempt-1) }
@@ -138,7 +138,7 @@ process fermikit {
     output:
         file 'fermikit.vcf' into fermi_vcf
 
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
@@ -250,7 +250,7 @@ process variant_effect_predictor {
     output:
         file '*.vep.vcf'
 
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
     queue 'core'
@@ -310,7 +310,7 @@ process snpEff {
     output:
         file '*.snpeff.vcf'
 
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
     queue 'core'
@@ -365,6 +365,7 @@ def usage_message() {
     log.info '                Callers: manta, fermikit (choose one or many)'
     log.info '                Annotation: vep OR snpeff'
     log.info '    --outdir        Directory where resultfiles are stored'
+    log.info '    --prefix        Prefix for result filenames'
     log.info ''
 }
 
