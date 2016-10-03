@@ -318,6 +318,7 @@ process snpEff {
 
     module 'bioinfo-tools'
     module "$params.modules.snpeff"
+    module "$params.modules.vt"
 
     when: 'snpeff' in workflowSteps
 
