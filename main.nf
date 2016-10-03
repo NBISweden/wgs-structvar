@@ -89,7 +89,7 @@ process manta {
     """
     configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
     cd testRun
-    ./runWorkflow.py -m local -j \$SLURM_CPUS_PER_NODE
+    ./runWorkflow.py -m local -j \$SLURM_CPUS_ON_NODE
     mv results/variants/diploidSV.vcf.gz ../manta.vcf.gz
     cd ..
     gunzip -c manta.vcf.gz > manta.vcf
@@ -155,9 +155,9 @@ process fermikit {
 
     script:
     """
-    fermi2.pl unitig -s3g -t\$SLURM_CPUS_PER_NODE -l150 -p sample sample.fq.gz > sample.mak
+    fermi2.pl unitig -s3g -t\$SLURM_CPUS_ON_NODE -l150 -p sample sample.fq.gz > sample.mak
     make -f sample.mak
-    run-calling -t\$SLURM_CPUS_PER_NODE $params.ref_fasta sample.mag.gz > calling.sh
+    run-calling -t\$SLURM_CPUS_ON_NODE $params.ref_fasta sample.mag.gz > calling.sh
     bash calling.sh
     vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
     bgzip -c fermikit.vcf > fermikit.vcf.gz
