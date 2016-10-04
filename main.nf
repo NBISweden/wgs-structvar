@@ -205,7 +205,7 @@ process mask_beds {
 // To make intersect files we need to combine them into one channel with
 // toSortedList() (fermi is before manta in alphabet).
 masked_vcfs.tap { masked_vcfs }
-           .filter( ~/manta|fermikit/ )
+           .filter( ~/.*(manta|fermikit).*/ )
            .toSortedList().set { intersect_input }
 
 process intersect_files {
@@ -282,10 +282,10 @@ process variant_effect_predictor {
     fi
 
     variant_effect_predictor.pl \
-        -i "\$infile"              \
+        -i "\$INFILE"              \
         --format "\$FORMAT"        \
         -cache --dir "\$VEP_CACHE" \
-        -o "\$outfile"             \
+        -o "\$OUTFILE"             \
         --vcf                      \
         --merged                   \
         --regulatory               \
