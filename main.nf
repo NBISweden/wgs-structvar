@@ -403,7 +403,7 @@ def grab_git_revision() {
 
     ref_file = file("${baseDir}/.git/$ref")
     if ( ! ref_file.exists() ) {
-        return ''
+        return 'v0.2'
     }
     revision = ref_file.newReader().readLine()
 
