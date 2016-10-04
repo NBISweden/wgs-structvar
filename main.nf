@@ -366,7 +366,7 @@ def usage_message() {
     log.info '                    missing.'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '    --steps         Specify what steps to run, comma separated:'
-    log.info '                Callers: manta, fermikit
+    log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
     log.info '    --outdir        Directory where resultfiles are stored (results)'
     log.info '    --prefix        Prefix for result filenames (empty)'
