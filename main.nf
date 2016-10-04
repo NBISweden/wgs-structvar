@@ -448,10 +448,6 @@ def processWorkflowSteps(steps) {
 
     workflowSteps = steps.split(',').collect { it.trim().toLowerCase() }
 
-    if ('vep' in workflowSteps && 'snpeff' in workflowSteps) {
-        exit 1, 'You can only run one annotator, either "vep" or "snpeff"'
-    }
-
     if ('manta' in workflowSteps) {
         workflowSteps.push( 'indexbam' )
     }
