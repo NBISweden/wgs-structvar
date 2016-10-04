@@ -360,13 +360,16 @@ def usage_message() {
     log.info '    --bam           Input bamfile'
     log.info '    --project       Uppmax project to log cluster time to'
     log.info '  Optional'
+    log.info '     (default values in parenthesis where applicable)'
     log.info '    --help          Show this message and exit'
+    log.info '                    Used by fermikit, will be created from the bam file if'
+    log.info '                    missing.'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '    --steps         Specify what steps to run, comma separated:'
-    log.info '                Callers: manta, fermikit (choose one or many)'
-    log.info '                Annotation: vep OR snpeff'
-    log.info '    --outdir        Directory where resultfiles are stored'
-    log.info '    --prefix        Prefix for result filenames'
+    log.info '                Callers: manta, fermikit
+    log.info '                Annotation: vep, snpeff'
+    log.info '    --outdir        Directory where resultfiles are stored (results)'
+    log.info '    --prefix        Prefix for result filenames (empty)'
     log.info ''
 }
 
