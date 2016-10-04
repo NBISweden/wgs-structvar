@@ -266,7 +266,7 @@ process variant_effect_predictor {
     INFILE="$infile"
     OUTFILE="\${INFILE%.vcf}.vep.vcf"
     VEP_CACHE="/sw/data/uppnex/vep/84"
-    ASSEMBLY="GRCh37"
+    ASSEMBLY="$params.assembly"
 
     case "\$INFILE" in
         *vcf) FORMAT="vcf" ;;
@@ -342,7 +342,7 @@ process snpEff {
     sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
         | vt decompose -s - \
         | vt normalize -r $params.ref_fasta - \
-        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic GRCh37.75 \
+        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic ${params.assembly}.75 \
         > "\$OUTFILE"
     """
 }
