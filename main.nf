@@ -379,7 +379,7 @@ def usage_message() {
 }
 
 def startup_message() {
-    revision = grab_git_revision()
+    revision = grab_git_revision() ?: 'v0.2'
 
     log.info "======================"
     log.info "WGS-structvar pipeline"
@@ -408,7 +408,7 @@ def grab_git_revision() {
 
     ref_file = file("${baseDir}/.git/$ref")
     if ( ! ref_file.exists() ) {
-        return 'v0.2'
+        return ''
     }
     revision = ref_file.newReader().readLine()
 
