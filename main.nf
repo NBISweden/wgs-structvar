@@ -203,10 +203,14 @@ process mask_beds {
 
 
 // To make intersect files we need to combine them into one channel with
-// toSortedList() (fermi is before manta in alphabet).
+// toList() and then sort in the map so that fermi is before manta in the
+// channel. We can't use toSortedList here since the full pathname is used
+// which includes the work directory (`3a/7c63f4...`).
 masked_vcfs.tap { masked_vcfs }
            .filter( ~/.*(manta|fermikit).*/ )
-           .toSortedList().set { intersect_input }
+           .toList()
+           .map { n -> n[0] =~ /fermikit/ ? n : [n[1], n[0]] }
+           .set { intersect_input }
 
 process intersect_files {
     input:
@@ -238,7 +242,8 @@ process intersect_files {
         | cut -f 1-8 \
         | sort -k1,1V -k2,2n > combined_masked_OTHER.vcf
 
-    sort -k1,1V -k2,2n combined_masked_*.vcf >> combined_masked.vcf
+    ( grep '^#' $fermi_vcf; \
+        sort -k1,1V -k2,2n combined_masked_*.vcf ) >> combined_masked.vcf
     """
 }
 
