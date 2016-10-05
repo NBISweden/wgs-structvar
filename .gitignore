@@ -1,1 +1,7 @@
 .nextflow.*
+results*
+slurm-*
+CEP-1-7*
+test_data
+.cache
+.nextflow

@@ -1,0 +1,18 @@
+digraph {
+    annotate [label="vep OR snpEFF"];
+    bamfile -> manta -> annotate [style=bold,color=red];
+    bamfile -> fermikit -> annotate [style=bold];
+    bamfile -> tiddit -> annotate [style=dotted];
+    bamfile -> CNVnator -> annotate [style=dotted];
+
+    {manta; fermikit} -> mask [style=bold];
+    {tiddit; CNVnator} -> mask [style=dotted];
+
+    mask -> intersect [label="manta",style=bold];
+    mask -> intersect [label="fermikit",style=bold];
+
+    intersect -> intersect_deletions -> annotate [style=bold];
+    intersect -> intersect_insertions -> annotate [style=bold];
+    intersect -> intersect_duplications -> annotate [style=bold];
+
+}

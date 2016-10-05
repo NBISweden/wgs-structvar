@@ -26,10 +26,8 @@ if (!params.project) {
     exit 1, 'You need to specify what project to run under, see --help for more information'
 }
 
-if (params.run_all) {
-    params.run_fermikit = true
-    params.run_manta = true
-}
+
+workflowSteps = processWorkflowSteps(params.steps)
 
 
 startup_message()
@@ -47,20 +45,14 @@ if (!bamindex) {
         output:
             file 'bamfile.bai' into bamfile_index
 
+        executor choose_executor()
+        queue 'core'
+        time params.runtime.simple
+
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
-        // We only need one core for this part
-        if ( nextflow_running_as_slurmjob() ) {
-            executor 'local'
-        }
-        else {
-            executor 'slurm'
-            queue 'core'
-            time params.short_job
-        }
-
-        when: params.run_manta == true
+        when: 'indexbam' in workflowSteps
 
         script:
         """
@@ -73,44 +65,34 @@ else {
     Channel.fromPath( bamindex ).set { bamfile_index }
 }
 
-process run_manta {
+process manta {
     input:
-        file 'bamfile_tmp' from bamfile
+        file 'bamfile' from bamfile
         file 'bamfile.bai' from bamfile_index
     output:
-        file 'manta.bed' into manta_bed
-        file 'manta.vcf'
+        file 'manta.vcf' into manta_vcf
 
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
+
+    errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
+    time { params.runtime.caller * 2**(task.attempt-1) }
+    maxRetries 3
+    queue 'core'
+    cpus 4
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
 
-    when: params.run_manta == true
+    when: 'manta' in workflowSteps
 
     script:
     """
-    # Manta follows symlinks and expects the index to be with the original
-    # file, so we copy it, and then clean up at script EXIT with a trap.
-    # TODO, this is fixed in manta v0.29.5, https://github.com/Illumina/manta/issues/32
-    DIR=`pwd`
-    function cleanup() {
-        echo "CLEAN UP"
-        cd \$DIR
-        if [ -f bamfile ]; then
-            rm bamfile
-        fi
-    }
-    trap cleanup EXIT
-    cp bamfile_tmp bamfile
-
     configManta.py --normalBam bamfile --referenceFasta $params.ref_fasta --runDir testRun
     cd testRun
-    ./runWorkflow.py -m local -j $params.threads
+    ./runWorkflow.py -m local -j \$SLURM_CPUS_ON_NODE
     mv results/variants/diploidSV.vcf.gz ../manta.vcf.gz
     cd ..
     gunzip -c manta.vcf.gz > manta.vcf
-    SVvcf2bed.pl manta.vcf > manta.bed
     """
 }
 
@@ -127,24 +109,17 @@ if (!params.fastq) {
     process create_fastq {
         input:
             file 'bamfile' from bamfile
-
         output:
             file 'fastq.fq.gz' into fastq
+
+        executor choose_executor()
+        queue 'core'
+        time params.runtime.simple
 
         module 'bioinfo-tools'
         module "$params.modules.samtools"
 
-        // We only need one core for this part
-        if ( nextflow_running_as_slurmjob() ) {
-            executor 'local'
-        }
-        else {
-            executor 'slurm'
-            queue 'core'
-            time params.short_job
-        }
-
-        when: params.run_fermikit == true
+        when: 'fastq' in workflowSteps
 
         script:
         """
@@ -157,14 +132,18 @@ else {
     Channel.fromPath( params.fastq ).set { fastq }
 }
 
-process fermikit_calling {
+process fermikit {
     input:
         file 'sample.fq.gz' from fastq
     output:
-        file 'fermikit.bed' into fermi_bed
-        file 'fermikit.vcf'
+        file 'fermikit.vcf' into fermi_vcf
 
-    publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
+
+    errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
+    time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
+    maxRetries 3
+    queue 'node'
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -172,23 +151,25 @@ process fermikit_calling {
     module "$params.modules.vcftools"
     module "$params.modules.tabix"
 
-    when: params.run_fermikit == true
+    when: 'fermikit' in workflowSteps
 
     script:
     """
-    fermi2.pl unitig -s$params.genome_size -t$params.threads -l$params.readlen -p sample sample.fq.gz > sample.mak
+    fermi2.pl unitig -s3g -t\$SLURM_CPUS_ON_NODE -l150 -p sample sample.fq.gz > sample.mak
     make -f sample.mak
-    run-calling -t$params.threads $params.ref_fasta sample.mag.gz > calling.sh
+    run-calling -t\$SLURM_CPUS_ON_NODE $params.ref_fasta sample.mag.gz > calling.sh
     bash calling.sh
     vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
     bgzip -c fermikit.vcf > fermikit.vcf.gz
-    SVvcf2bed.pl fermikit.vcf > fermikit.bed
     """
 }
 
 
-
 // 3. Create summary files
+
+// Collect vcfs and beds into one channel
+vcfs = manta_vcf.mix( fermi_vcf )
+
 mask_files = [
     "$baseDir/data/ceph18.b37.lumpy.exclude.2014-01-15.bed",
     "$baseDir/data/LCR-hs37d5.bed.gz"
@@ -196,86 +177,183 @@ mask_files = [
 
 masks = mask_files.collect { file(it) }.channel()
 // Collect both bed files and combine them with the mask files
-beds = manta_bed.mix( fermi_bed )
-beds.spread( masks.buffer(size: 2) ).set { mask_input }
+vcfs.tap { vcfs }.spread( masks.buffer(size: 2) ).set { mask_input }
 
 process mask_beds {
     input:
-        set file(bedfile), file(mask1), file(mask2) from mask_input
+        set file(svfile), file(mask1), file(mask2) from mask_input
     output:
-        file '*_masked.bed' into masked_beds
-        file '*_masked_*.bed'
+        file '*_masked.vcf' into masked_vcfs
 
-    publishDir params.outdir, mode: 'copy'
-
-    // Does not use many resources, run it locally
-    executor 'local'
+    executor choose_executor()
+    queue 'core'
+    time params.runtime.simple
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
 
     """
-    BNAME=\$( echo $bedfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.bed
-    cat $bedfile \
-        | bedtools intersect -v -a stdin -b $mask1 -f 0.25 \
-        | bedtools intersect -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
-
-
-    ## In case grep doesn't find anything it will exit with non-zero exit
-    ## status, which will cause slurm to abort the job, we want to continue on
-    ## error here.
-    set +e
-
-    ## Create filtered bed files
-    for WORD in DEL INS DUP; do
-        grep -w \$WORD \$MASK_FILE > \${BNAME}_masked_\${WORD,,}.bed
-    done
-
-    set -e # Restore exit-settings
+    BNAME=\$( echo $svfile | cut -d. -f1 )
+    MASK_FILE=\${BNAME}_masked.vcf
+    cat $svfile \
+        | bedtools intersect -header -v -a stdin -b $mask1 -f 0.25 \
+        | bedtools intersect -header -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
     """
 }
 
+
 // To make intersect files we need to combine them into one channel with
-// toList(). And also figure out if we have one or two files, therefore the
-// tap and count_beds.
-masked_beds.tap { count_beds_tmp }.toList().set { intersect_input }
-count_beds_tmp.count().set { count_beds }
+// toList() and then sort in the map so that fermi is before manta in the
+// channel. We can't use toSortedList here since the full pathname is used
+// which includes the work directory (`3a/7c63f4...`).
+masked_vcfs.tap { masked_vcfs }
+           .filter( ~/.*(manta|fermikit).*/ )
+           .toList()
+           .map { n -> n[0] =~ /fermikit/ ? n : [n[1], n[0]] }
+           .set { intersect_input }
 
 process intersect_files {
     input:
-        set file(bed1), file(bed2) from intersect_input
-        val nbeds from count_beds
+        set file(fermi_vcf), file(manta_vcf) from intersect_input
     output:
-        file "combined*.bed"
+        file "combined_masked.vcf" into intersections
 
-    publishDir params.outdir, mode: 'copy'
-
-    // Does not use many resources, run it locally
-    executor 'local'
+    executor choose_executor()
+    queue 'core'
+    time params.runtime.simple
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
 
-    when: nbeds == 2
+    when: 'make_intersect' in workflowSteps
 
     script:
     """
-    ## In case grep doesn't find anything it will exit with non-zero exit
-    ## status, which will cause slurm to abort the job, we want to continue on
-    ## error here.
-    set +e
-
-    ## Create intersected bed files
+    ## Create intersected vcf files
     for WORD in DEL INS DUP; do
-        intersectBed -a <( grep -w \$WORD $bed1 ) -b <( grep -w \$WORD $bed2 ) \
+        intersectBed -a <( grep -w "^#.\\+\\|\$WORD" $fermi_vcf) \
+                     -b <( grep -w "^#.\\+\\|\$WORD" $manta_vcf) \
             -f 0.5 -r \
-            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.bed
+            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.vcf
     done
 
-    set -e # Restore exit-settings
+    cat <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' $fermi_vcf ) \
+        <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' $manta_vcf ) \
+        | cut -f 1-8 \
+        | sort -k1,1V -k2,2n > combined_masked_OTHER.vcf
+
+    ( grep '^#' $fermi_vcf; \
+        sort -k1,1V -k2,2n combined_masked_*.vcf ) >> combined_masked.vcf
     """
 }
+
+annotate_files = intersections.flatten().mix( masked_vcfs.tap { masked_vcfs } )
+
+process variant_effect_predictor {
+    input:
+        file infile from annotate_files.tap { annotate_files }
+    output:
+        file '*.vep.vcf'
+
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
+
+    executor choose_executor()
+    queue 'core'
+    time params.runtime.simple
+
+    module 'bioinfo-tools'
+    module "$params.modules.vep"
+
+    when: 'vep' in workflowSteps
+
+    script:
+    """
+    INFILE="$infile"
+    OUTFILE="\${INFILE%.vcf}.vep.vcf"
+    VEP_CACHE="/sw/data/uppnex/vep/84"
+    ASSEMBLY="$params.assembly"
+
+    case "\$INFILE" in
+        *vcf) FORMAT="vcf" ;;
+        *bed) FORMAT="ensembl" ;;
+        *)    printf "Unrecognized format for '%s'" "\$INFILE" >&2
+              exit 1;;
+    esac
+
+    ## If the input file is empty, just copy it
+    if [[ -f "\$INFILE" && -s "\$INFILE" ]]; then
+        cp "\$INFILE" "\$OUTFILE"
+        exit
+    fi
+
+    variant_effect_predictor.pl \
+        -i "\$INFILE"              \
+        --format "\$FORMAT"        \
+        -cache --dir "\$VEP_CACHE" \
+        -o "\$OUTFILE"             \
+        --vcf                      \
+        --merged                   \
+        --regulatory               \
+        --force_overwrite          \
+        --sift b                   \
+        --polyphen b               \
+        --symbol                   \
+        --numbers                  \
+        --biotype                  \
+        --total_length             \
+        --canonical                \
+        --ccds                     \
+        --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
+        --assembly "\$ASSEMBLY" \
+        --offline
+    """
+}
+
+process snpEff {
+    input:
+        file infile from annotate_files.tap { annotate_files }
+    output:
+        file '*.snpeff.vcf'
+
+    publishDir params.outdir, mode: 'copy', saveAs: { "$params.prefix$it" }
+
+    executor choose_executor()
+    queue 'core'
+    time params.runtime.simple
+
+    module 'bioinfo-tools'
+    module "$params.modules.snpeff"
+    module "$params.modules.vt"
+
+    when: 'snpeff' in workflowSteps
+
+    script:
+    """
+    INFILE="$infile" ## Use bash-semantics for variables
+    OUTFILE="\${INFILE%.vcf}.snpeff.vcf"
+    SNPEFFJAR=''
+
+    for P in \$( tr ':' ' ' <<<"\$CLASSPATH" ); do
+        if [ -f "\$P/snpEff.jar" ]; then
+            SNPEFFJAR="\$P/snpEff.jar"
+            break
+        fi
+    done
+    if [ -z "\$SNPEFFJAR" ]; then
+        printf "Can't find snpEff.jar in '%s'" "\$CLASSPATH" >&2
+        exit 1
+    fi
+
+    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
+        | vt decompose -s - \
+        | vt normalize -r $params.ref_fasta - \
+        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic ${params.assembly}.75 \
+        > "\$OUTFILE"
+    """
+}
+
+
+// Utility functions
 
 def usage_message() {
     log.info ''
@@ -287,19 +365,21 @@ def usage_message() {
     log.info '    --bam           Input bamfile'
     log.info '    --project       Uppmax project to log cluster time to'
     log.info '  Optional'
+    log.info '     (default values in parenthesis where applicable)'
     log.info '    --help          Show this message and exit'
+    log.info '                    Used by fermikit, will be created from the bam file if'
+    log.info '                    missing.'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
-    log.info '    --run_manta     Run manta (default)'
-    log.info '    --run_fermikit  Run fermikit'
-    log.info '    --run_all       Run all callers'
-    log.info '    --long_job      Running time for long job (callers, fermi and manta)'
-    log.info '    --short_job     Running time for short jobs (bam indexing and bam2fq)'
-    log.info '    --outdir        Directory where resultfiles are stored'
+    log.info '    --steps         Specify what steps to run, comma separated:'
+    log.info '                Callers: manta, fermikit'
+    log.info '                Annotation: vep, snpeff'
+    log.info '    --outdir        Directory where resultfiles are stored (results)'
+    log.info '    --prefix        Prefix for result filenames (empty)'
     log.info ''
 }
 
 def startup_message() {
-    revision = grab_git_revision()
+    revision = grab_git_revision() ?: 'v0.2'
 
     log.info "======================"
     log.info "WGS-structvar pipeline"
@@ -310,6 +390,7 @@ def startup_message() {
     log.info "Work dir   : $workDir"
     log.info "Output dir : $params.outdir"
     log.info "Project    : $params.project"
+    log.info "Will run   : " + workflowSteps.join(", ")
     log.info ""
 }
 
@@ -357,4 +438,32 @@ def nextflow_running_as_slurmjob() {
         return true
     }
     return false
+}
+
+/* If the nextflow deamon is running as a slurm job, we can use the local CPU
+ * for a lot of our work */
+def choose_executor() {
+    return nextflow_running_as_slurmjob() ? 'local' : 'slurm'
+}
+
+def processWorkflowSteps(steps) {
+    if ( ! steps ) {
+        return []
+    }
+
+    workflowSteps = steps.split(',').collect { it.trim().toLowerCase() }
+
+    if ('manta' in workflowSteps) {
+        workflowSteps.push( 'indexbam' )
+    }
+
+    if ('fermikit' in workflowSteps) {
+        workflowSteps.push( 'fastq' )
+    }
+
+    if ('manta' in workflowSteps && 'fermikit' in workflowSteps) {
+        workflowSteps.push( 'make_intersect' )
+    }
+
+    return workflowSteps
 }
