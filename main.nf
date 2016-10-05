@@ -203,10 +203,14 @@ process mask_beds {
 
 
 // To make intersect files we need to combine them into one channel with
-// toSortedList() (fermi is before manta in alphabet).
+// toList() and then sort in the map so that fermi is before manta in the
+// channel. We can't use toSortedList here since the full pathname is used
+// which includes the work directory (`3a/7c63f4...`).
 masked_vcfs.tap { masked_vcfs }
-           .filter( ~/manta|fermikit/ )
-           .toSortedList().set { intersect_input }
+           .filter( ~/.*(manta|fermikit).*/ )
+           .toList()
+           .map { n -> n[0] =~ /fermikit/ ? n : [n[1], n[0]] }
+           .set { intersect_input }
 
 process intersect_files {
     input:
@@ -238,7 +242,8 @@ process intersect_files {
         | cut -f 1-8 \
         | sort -k1,1V -k2,2n > combined_masked_OTHER.vcf
 
-    sort -k1,1V -k2,2n combined_masked_*.vcf >> combined_masked.vcf
+    ( grep '^#' $fermi_vcf; \
+        sort -k1,1V -k2,2n combined_masked_*.vcf ) >> combined_masked.vcf
     """
 }
 
@@ -266,7 +271,7 @@ process variant_effect_predictor {
     INFILE="$infile"
     OUTFILE="\${INFILE%.vcf}.vep.vcf"
     VEP_CACHE="/sw/data/uppnex/vep/84"
-    ASSEMBLY="GRCh37"
+    ASSEMBLY="$params.assembly"
 
     case "\$INFILE" in
         *vcf) FORMAT="vcf" ;;
@@ -282,10 +287,10 @@ process variant_effect_predictor {
     fi
 
     variant_effect_predictor.pl \
-        -i "\$infile"              \
+        -i "\$INFILE"              \
         --format "\$FORMAT"        \
         -cache --dir "\$VEP_CACHE" \
-        -o "\$outfile"             \
+        -o "\$OUTFILE"             \
         --vcf                      \
         --merged                   \
         --regulatory               \
@@ -342,7 +347,7 @@ process snpEff {
     sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
         | vt decompose -s - \
         | vt normalize -r $params.ref_fasta - \
-        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic GRCh37.75 \
+        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic ${params.assembly}.75 \
         > "\$OUTFILE"
     """
 }
@@ -360,13 +365,16 @@ def usage_message() {
     log.info '    --bam           Input bamfile'
     log.info '    --project       Uppmax project to log cluster time to'
     log.info '  Optional'
+    log.info '     (default values in parenthesis where applicable)'
     log.info '    --help          Show this message and exit'
+    log.info '                    Used by fermikit, will be created from the bam file if'
+    log.info '                    missing.'
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '    --steps         Specify what steps to run, comma separated:'
-    log.info '                Callers: manta, fermikit (choose one or many)'
-    log.info '                Annotation: vep OR snpeff'
-    log.info '    --outdir        Directory where resultfiles are stored'
-    log.info '    --prefix        Prefix for result filenames'
+    log.info '                Callers: manta, fermikit'
+    log.info '                Annotation: vep, snpeff'
+    log.info '    --outdir        Directory where resultfiles are stored (results)'
+    log.info '    --prefix        Prefix for result filenames (empty)'
     log.info ''
 }
 
@@ -400,7 +408,7 @@ def grab_git_revision() {
 
     ref_file = file("${baseDir}/.git/$ref")
     if ( ! ref_file.exists() ) {
-        return ''
+        return 'v0.2'
     }
     revision = ref_file.newReader().readLine()
 
@@ -444,10 +452,6 @@ def processWorkflowSteps(steps) {
     }
 
     workflowSteps = steps.split(',').collect { it.trim().toLowerCase() }
-
-    if ('vep' in workflowSteps && 'snpeff' in workflowSteps) {
-        exit 1, 'You can only run one annotator, either "vep" or "snpeff"'
-    }
 
     if ('manta' in workflowSteps) {
         workflowSteps.push( 'indexbam' )
