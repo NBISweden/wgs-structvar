@@ -77,8 +77,7 @@ process manta {
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.caller * 2**(task.attempt-1) }
     maxRetries 3
-    queue 'core'
-    cpus 4
+    queue 'node'
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -112,9 +111,10 @@ if (!params.fastq) {
         output:
             file 'fastq.fq.gz' into fastq
 
-        executor choose_executor()
+        //executor choose_executor()
+        executor 'slurm'
         queue 'core'
-        time params.runtime.simple
+        time params.runtime.caller
 
         module 'bioinfo-tools'
         module "$params.modules.samtools"

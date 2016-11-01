@@ -5,8 +5,8 @@ module load samtools
 
 set -x
 
-CHR="1 2"
-FN="1-2"
+CHR="20"
+FN="20"
 
 BASEDIR=/proj/a2009002/webexport/opendata/HiSeqX_CEPH/CEP-1-7/03-BAM
 BASEFILE=CEP-1-7.clean.dedup.recal
