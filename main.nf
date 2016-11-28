@@ -194,10 +194,15 @@ process mask_beds {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.vcf
-    cat $svfile \
-        | bedtools intersect -header -v -a stdin -b $mask1 -f 0.25 \
-        | bedtools intersect -header -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
+    OUT_FILE=\${BNAME}_masked.vcf
+    MASK_DIR=$mask_dir
+
+    cp $svfile workfile
+    for mask in \$MASK_DIR/*; do
+        bedtools intersect -header -v -a workfile -b \$mask -f 0.25 > tempfile
+        mv tempfile workfile
+    done
+    mv workfile \$OUT_FILE
     """
 }
 
