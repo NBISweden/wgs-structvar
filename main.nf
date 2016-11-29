@@ -268,6 +268,7 @@ process variant_effect_predictor {
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
+    module "$params.modules.vt"
 
     when: 'vep' in workflowSteps
 
@@ -281,7 +282,7 @@ process variant_effect_predictor {
     case "\$INFILE" in
         *vcf) FORMAT="vcf" ;;
         *bed) FORMAT="ensembl" ;;
-        *)    printf "Unrecognized format for '%s'" "\$INFILE" >&2
+        *)    printf "Unrecognized format for '%s'\n" "\$INFILE" >&2
               exit 1;;
     esac
 
@@ -291,8 +292,18 @@ process variant_effect_predictor {
         exit
     fi
 
+    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
+        | vt decompose -s - \
+        | vt normalize -r $params.ref_fasta - \
+        > "\$INFILE.vt"
+
+    if [ -z "\$INFILE.vt" ]; then
+        printf "VT Failed\n" >&2
+        cp "\$INFILE" "\$INFILE.vt"
+    fi
+
     variant_effect_predictor.pl \
-        -i "\$INFILE"              \
+        -i "\$INFILE.vt"           \
         --format "\$FORMAT"        \
         -cache --dir "\$VEP_CACHE" \
         -o "\$OUTFILE"             \
@@ -336,24 +347,18 @@ process snpEff {
     """
     INFILE="$infile" ## Use bash-semantics for variables
     OUTFILE="\${INFILE%.vcf}.snpeff.vcf"
-    SNPEFFJAR=''
-
-    for P in \$( tr ':' ' ' <<<"\$CLASSPATH" ); do
-        if [ -f "\$P/snpEff.jar" ]; then
-            SNPEFFJAR="\$P/snpEff.jar"
-            break
-        fi
-    done
-    if [ -z "\$SNPEFFJAR" ]; then
-        printf "Can't find snpEff.jar in '%s'" "\$CLASSPATH" >&2
-        exit 1
-    fi
 
     sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
         | vt decompose -s - \
         | vt normalize -r $params.ref_fasta - \
-        | java -Xmx7G -jar "\$SNPEFFJAR" -formatEff -classic ${params.assembly}.75 \
-        > "\$OUTFILE"
+        > "\$INFILE.vt"
+
+    if [ -z "\$INFILE.vt" ]; then
+        printf "VT Failed\n" >&2
+        cp "\$INFILE" "\$INFILE.vt"
+    fi
+
+    snpEff -formatEff -classic ${params.assembly}.75 < "\$INFILE.vt" > "\$OUTFILE"
     """
 }
 
