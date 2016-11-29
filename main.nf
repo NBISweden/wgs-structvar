@@ -77,8 +77,7 @@ process manta {
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.caller * 2**(task.attempt-1) }
     maxRetries 3
-    queue 'core'
-    cpus 4
+    queue 'node'
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -112,9 +111,10 @@ if (!params.fastq) {
         output:
             file 'fastq.fq.gz' into fastq
 
-        executor choose_executor()
+        //executor choose_executor()
+        executor 'slurm'
         queue 'core'
-        time params.runtime.simple
+        time params.runtime.caller
 
         module 'bioinfo-tools'
         module "$params.modules.samtools"
@@ -194,10 +194,15 @@ process mask_beds {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.vcf
-    cat $svfile \
-        | bedtools intersect -header -v -a stdin -b $mask1 -f 0.25 \
-        | bedtools intersect -header -v -a stdin -b $mask2 -f 0.25 > \$MASK_FILE
+    OUT_FILE=\${BNAME}_masked.vcf
+    MASK_DIR=$mask_dir
+
+    cp $svfile workfile
+    for mask in \$MASK_DIR/*; do
+        bedtools intersect -header -v -a workfile -b \$mask -f 0.25 > tempfile
+        mv tempfile workfile
+    done
+    mv workfile \$OUT_FILE
     """
 }
 
