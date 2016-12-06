@@ -245,7 +245,7 @@ process intersect_files {
 
     script:
     """
-    if [[ \$( head -n 10 ${vcfs[0]} | grep 'source=htsbox' ) ]]; then
+    if head -n 10 ${vcfs[0]} | grep -q 'source=htsbox'; then
         fermi_vcf=${vcfs[0]}
         manta_vcf=${vcfs[1]}
     else
