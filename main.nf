@@ -271,10 +271,62 @@ process intersect_files {
     """
 }
 
-//annotate_files = intersections.flatten().mix( masked_vcfs.tap { masked_vcfs } )
+ch_normalize_vcf = Channel.create()
 
-ch_annotate = ch_masked_vcfs_vep.mix( ch_intersections )
-ch_annotate_snpeff = ch_annotate.tap { ch_annotate_vep }
+if ( 'normalize' in workflowSteps ) {
+    ch_masked_vcfs_vep.mix( ch_intersections ).set { ch_normalize_vcf }
+}
+else {
+    ch_masked_vcfs_vep.mix( ch_intersections ).set { ch_annotate }
+
+    // So we don't get stuck in an infinite loop
+    ch_normalize_vcf.close()
+}
+
+process normalize_vcf {
+    input:
+        set file(infile), val(uuid), val(dir) from ch_normalize_vcf
+    output:
+        set file("*.vt.vcf"), val(uuid), val(dir) into ch_normalized_vcf
+
+    tag "$uuid - $infile"
+
+    executor choose_executor()
+    queue 'core'
+    time params.runtime.simple
+
+    module 'bioinfo-tools'
+    module "$params.modules.vt"
+
+    """
+    INFILE="$infile"
+    OUTFILE="\${INFILE%.vcf}.vt.vcf"
+
+    ## If the input file is empty, just copy it
+    if [[ -f "\$INFILE" && -s "\$INFILE" ]]; then
+        cp "\$INFILE" "\$OUTFILE"
+        exit
+    fi
+
+
+    ## Normalization
+    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
+        | vt decompose -s - > "\$INFILE.vt_temp"
+
+    if ! vt normalize -r "$params.ref_fasta" "\$INFILE.vt_temp" > "\$OUTFILE"
+    then
+        printf "VT normalisation Failed\n" >&2
+        cp "\$INFILE.vt_temp" "\$OUTFILE"
+    fi
+    """
+}
+
+if ( 'normalize' in workflowSteps ) {
+    ch_annotate_snpeff = ch_normalized_vcf.tap { ch_annotate_vep }
+}
+else {
+    ch_annotate_snpeff = ch_annotate.tap { ch_annotate_vep }
+}
 
 process variant_effect_predictor {
     input:
@@ -291,7 +343,6 @@ process variant_effect_predictor {
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
-    module "$params.modules.vt"
 
     when: 'vep' in workflowSteps
 
@@ -309,24 +360,8 @@ process variant_effect_predictor {
               exit 1;;
     esac
 
-    ## If the input file is empty, just copy it
-    if [[ -f "\$INFILE" && -s "\$INFILE" ]]; then
-        cp "\$INFILE" "\$OUTFILE"
-        exit
-    fi
-
-    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
-        | vt decompose -s - \
-        | vt normalize -r $params.ref_fasta - \
-        > "\$INFILE.vt"
-
-    if [ -z "\$INFILE.vt" ]; then
-        printf "VT Failed\n" >&2
-        cp "\$INFILE" "\$INFILE.vt"
-    fi
-
     variant_effect_predictor.pl \
-        -i "\$INFILE.vt"           \
+        -i "\$INFILE"              \
         --format "\$FORMAT"        \
         -cache --dir "\$VEP_CACHE" \
         -o "\$OUTFILE"             \
@@ -363,6 +398,7 @@ process snpEff {
 
     module 'bioinfo-tools'
     module "$params.modules.snpeff"
+    module "$params.modules.vt"
 
     when: 'snpeff' in workflowSteps
 
@@ -371,17 +407,7 @@ process snpEff {
     INFILE="$infile" ## Use bash-semantics for variables
     OUTFILE="\${INFILE%.vcf}.snpeff.vcf"
 
-    sed 's/ID=AD,Number=./ID=AD,Number=R/' "\$INFILE" \
-        | vt decompose -s - \
-        | vt normalize -r $params.ref_fasta - \
-        > "\$INFILE.vt"
-
-    if [ -z "\$INFILE.vt" ]; then
-        printf "VT Failed\n" >&2
-        cp "\$INFILE" "\$INFILE.vt"
-    fi
-
-    snpEff -formatEff -classic ${params.assembly}.75 < "\$INFILE.vt" > "\$OUTFILE"
+    snpEff -formatEff -classic ${params.assembly}.75 < "\$INFILE" > "\$OUTFILE"
     """
 }
 
