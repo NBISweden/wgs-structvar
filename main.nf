@@ -437,6 +437,7 @@ def usage_message() {
     log.info '    --steps         Specify what steps to run, comma separated:'
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
+    log.info '                Extra: normalize (with vt)'
     log.info '    --outdir        Directory where resultfiles are stored (results)'
     log.info '    --prefix        Prefix for result filenames (empty)'
     log.info ''
