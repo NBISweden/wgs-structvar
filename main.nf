@@ -360,6 +360,12 @@ process variant_effect_predictor {
               exit 1;;
     esac
 
+    # VEP failes files without variants, but the pipeline should still run
+    if ! grep -qv '^#' \$INFILE; then
+        cp \$INFILE \$OUTFILE
+        exit 0
+    fi
+
     variant_effect_predictor.pl \
         -i "\$INFILE"              \
         --format "\$FORMAT"        \
