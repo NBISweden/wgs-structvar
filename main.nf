@@ -182,7 +182,7 @@ process fermikit {
 
 // 3. Create summary files
 
-mask_dir = file("masks")
+mask_dir = file("$baseDir/masks")
 ch_vcfs = ch_manta_vcf.mix( ch_fermi_vcf )
 
 process mask_vcfs {
