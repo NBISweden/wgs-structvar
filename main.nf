@@ -12,7 +12,7 @@ if (params.help) {
     exit 0
 }
 
-if (!params.project) {
+if (!params.project && workflow.profile != 'local') {
     exit 1, 'You need to specify what project to run under, see --help for more information'
 }
 

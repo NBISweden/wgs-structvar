@@ -19,6 +19,9 @@ This will run both manta and fermikit, annotate the results with variant
 effect predictor and create summary files for everything in the `results`
 subdirectory.
 
+To run everything locally (only for testing on very small datasets), pass `-profile local` and omit the
+`--project` option.
+
 It is recommended that you set the environment variable `NXF_WORK` to
 something like
 
