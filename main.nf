@@ -553,6 +553,9 @@ def nextflow_running_as_slurmjob() {
 /* If the nextflow deamon is running as a slurm job, we can use the local CPU
  * for a lot of our work */
 def choose_executor() {
+    if workflow.profile == 'local' {
+        return 'local'
+    }
     return nextflow_running_as_slurmjob() ? 'local' : 'slurm'
 }
 
