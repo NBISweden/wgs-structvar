@@ -73,6 +73,19 @@ Options:
 The log file `.nextflow.log` will be produced when running and can be monitored
 by e.g. `tail -f .nextflow.log`
 
+### SLURM usage
+
+There are three ways to run the pipeline:
+```bash
+# Local run on node where one is logged in
+nextflow main.nf -profile local <options>
+
+# Called from login node, nextflow will queue SLURM jobs itself
+nextflow main.nf <options>
+
+# When running inside a SLURM job nextflow will run on the local node
+srun nextflow main.nf <options>
+```
 
 ### Customization
 
