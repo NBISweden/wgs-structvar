@@ -441,7 +441,7 @@ def usage_message() {
     log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '                    Used by fermikit, will be created from the bam file if'
     log.info '                    missing.'
-    log.info '    --steps         Specify what steps to run, comma separated:'
+    log.info '    --steps         Specify what steps to run, comma separated: (default: manta, vep)'
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
     log.info '                Extra: normalize (with vt)'
