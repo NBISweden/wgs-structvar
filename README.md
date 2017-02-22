@@ -10,7 +10,7 @@ mv ./nextflow ~/bin
 # Set work dir to no-backup, put this in your .bashrc
 export NXF_WORK=$SNIC_NOBACKUP/work
 
-# Pull worfklow from this repo, run manta, fermikit and variant effect predictor:
+# Pull worfklow from this repo, run manta, normalize, and variant effect predictor:
 nextflow run NBISweden/wgs-structvar --project <uppmax_project_id> --bam <bamfile.bam> --steps manta,normalize,vep
 
 # Monitor log file
