@@ -64,7 +64,7 @@ process index_bamfile {
     tag "$uuid"
 
     executor choose_executor()
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.samtools"
@@ -91,7 +91,7 @@ process manta {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.runtime.caller * 2**(task.attempt-1) }
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller * 2 **(task.attempt-1) }
     maxRetries 3
     cpus 16 
 
@@ -129,7 +129,7 @@ process create_fastq {
 
     executor choose_executor()
     
-    time params.runtime.caller
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller }
 
     module 'bioinfo-tools'
     module "$params.modules.samtools"
@@ -156,7 +156,7 @@ process fermikit {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.fermikit * 2**( task.attempt -1 ) }
     maxRetries 3
     cpus 16
 
@@ -195,7 +195,7 @@ process mask_vcfs {
 
     executor choose_executor()
     
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -235,7 +235,7 @@ process intersect_files {
 
     executor choose_executor()
     
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -292,7 +292,7 @@ process normalize_vcf {
 
     executor choose_executor()
     
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.vt"
@@ -338,7 +338,7 @@ process variant_effect_predictor {
 
     executor choose_executor()
     queue 'core'
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
@@ -399,7 +399,7 @@ process snpEff {
 
     executor choose_executor()
     
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.snpeff"
