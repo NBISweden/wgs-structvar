@@ -340,9 +340,6 @@ process variant_effect_predictor {
     queue 'core'
     time params.runtime.simple
     cpus 4
-    clusterOptions = {
-        "-A $params.project"
-    }
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
