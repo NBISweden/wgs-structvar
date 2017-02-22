@@ -336,7 +336,6 @@ process variant_effect_predictor {
     tag "$uuid - $infile"
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
-    queue 'core'
     cpus 4
     time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
