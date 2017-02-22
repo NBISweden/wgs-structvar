@@ -64,7 +64,6 @@ process index_bamfile {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
     time params.runtime.simple
 
     module 'bioinfo-tools'
@@ -94,7 +93,7 @@ process manta {
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.caller * 2**(task.attempt-1) }
     maxRetries 3
-    queue 'node'
+    cpus 16 
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -129,7 +128,7 @@ process create_fastq {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
+    
     time params.runtime.caller
 
     module 'bioinfo-tools'
@@ -159,7 +158,7 @@ process fermikit {
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
     maxRetries 3
-    queue 'node'
+    cpus 16
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -195,7 +194,7 @@ process mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    queue 'core'
+    
     time params.runtime.simple
 
     module 'bioinfo-tools'
@@ -235,7 +234,7 @@ process intersect_files {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
+    
     time params.runtime.simple
 
     module 'bioinfo-tools'
@@ -292,7 +291,7 @@ process normalize_vcf {
     tag "$uuid - $infile"
 
     executor choose_executor()
-    queue 'core'
+    
     time params.runtime.simple
 
     module 'bioinfo-tools'
@@ -399,7 +398,7 @@ process snpEff {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
-    queue 'core'
+    
     time params.runtime.simple
 
     module 'bioinfo-tools'
