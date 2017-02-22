@@ -11,7 +11,7 @@ mv ./nextflow ~/bin
 export NXF_WORK=$SNIC_NOBACKUP/work
 
 # Pull worfklow from this repo, run manta, fermikit and variant effect predictor:
-nextflow run NBISweden/wgs-structvar --project <uppmax_project_id> --bam <bamfile.bam> --steps manta,fermikit,vep
+nextflow run NBISweden/wgs-structvar --project <uppmax_project_id> --bam <bamfile.bam> --steps manta,normalize,vep
 
 # Monitor log file
 tail -f .nextflow.log
