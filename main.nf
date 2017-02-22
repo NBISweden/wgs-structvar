@@ -64,8 +64,7 @@ process index_bamfile {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.samtools"
@@ -92,9 +91,9 @@ process manta {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.runtime.caller * 2**(task.attempt-1) }
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller * 2 **(task.attempt-1) }
     maxRetries 3
-    queue 'node'
+    cpus 16 
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -129,8 +128,8 @@ process create_fastq {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.caller
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller }
 
     module 'bioinfo-tools'
     module "$params.modules.samtools"
@@ -157,9 +156,9 @@ process fermikit {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.fermikit * 2**( task.attempt -1 ) }
     maxRetries 3
-    queue 'node'
+    cpus 16
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -195,8 +194,8 @@ process mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -235,8 +234,8 @@ process intersect_files {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -292,8 +291,8 @@ process normalize_vcf {
     tag "$uuid - $infile"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.vt"
@@ -338,8 +337,8 @@ process variant_effect_predictor {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     queue 'core'
-    time params.runtime.simple
     cpus 4
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
@@ -400,8 +399,8 @@ process snpEff {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.snpeff"
