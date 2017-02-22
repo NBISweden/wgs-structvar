@@ -336,8 +336,8 @@ process variant_effect_predictor {
     tag "$uuid - $infile"
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
-    executor choose_executor()
     queue 'core'
+    cpus 4
     time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
@@ -382,6 +382,7 @@ process variant_effect_predictor {
         --total_length             \
         --canonical                \
         --ccds                     \
+        --fork \$SLURM_JOB_CPUS_PER_NODE \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$ASSEMBLY" \
         --offline
