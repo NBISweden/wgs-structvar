@@ -12,9 +12,7 @@ if (params.help) {
     exit 0
 }
 
-if (!params.project && workflow.profile != 'local') {
-    exit 1, 'You need to specify what project to run under, see --help for more information'
-}
+check_input_params()
 
 
 /* Figure out what steps to run */
@@ -27,16 +25,12 @@ workflowSteps = processWorkflowSteps(params.steps)
  *  Last two elements of the array is ALWAYS `uuid` and `outdir` in that
  * order.
  */
-if (!params.bam && !params.runfile) {
-    exit 1, 'You need to specify a bam or runfile file, see --help for more information'
-} else if (params.bam && params.runfile) {
-    exit 1, "You can only specify one of bam and runfile, see --help for more information"
-} else if (params.bam) {
+
+if (params.bam) {
     ch_in = setup_input_channel_from_bam(params.bam)
 } else if (params.runfile) {
     ch_in = setup_input_channel_from_runfile(params.runfile)
 }
-
 
 // One input for fermi and one for manta
 ch_in_manta = ch_in.tap { ch_in_fermi }
@@ -420,8 +414,8 @@ process snpEff {
 // Utility functions
 
 def usage_message() {
-    log.info ''
-    log.info 'Usage:'
+    log.info 'WGS-structvar pipeline'
+    log.info 'USAGE:'
     log.info 'Run a local copy of the wgs-structvar WF:'
     log.info '    nextflow main.nf --bam <bamfile> [more options]'
     log.info 'OR run from github:'
@@ -456,6 +450,25 @@ def usage_message() {
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
     log.info ''
+}
+
+def check_input_params() {
+    error = false
+    if (!params.project && workflow.profile != 'local') {
+        log.info('You need to specify what project to run under')
+        error = true
+    }
+    if (!params.bam && !params.runfile) {
+        log.info('You need to specify a bam or runfile file')
+        error = true
+    } else if (params.bam && params.runfile) {
+        log.info('You can only specify one of bam and runfile')
+        error = true
+    }
+    if (error) {
+        log.info('See --help for more information')
+        exit 1
+    }
 }
 
 def startup_message() {
