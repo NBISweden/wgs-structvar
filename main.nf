@@ -10,10 +10,8 @@ WGS Structural Variation Pipeline
 if (params.help) {
     usage_message()
     exit 0
-}
-
-if (!params.project && workflow.profile != 'local') {
-    exit 1, 'You need to specify what project to run under, see --help for more information'
+} else {
+check_input_params()
 }
 
 
@@ -27,16 +25,32 @@ workflowSteps = processWorkflowSteps(params.steps)
  *  Last two elements of the array is ALWAYS `uuid` and `outdir` in that
  * order.
  */
-if (!params.bam && !params.runfile) {
-    exit 1, 'You need to specify a bam or runfile file, see --help for more information'
-} else if (params.bam && params.runfile) {
-    exit 1, "You can only specify one of bam and runfile, see --help for more information"
-} else if (params.bam) {
+
+def check_input_params() {
+    error = false
+    if (!params.project && workflow.profile != 'local') {
+        log.info('You need to specify what project to run under')
+        error = true
+    }
+    if (!params.bam && !params.runfile) {
+        log.info('You need to specify a bam or runfile file')
+        error = true
+    } else if (params.bam && params.runfile) {
+        log.info('You can only specify one of bam and runfile')
+        error = true
+    }
+    if (error) {
+        log.info('See --help for more information')
+        exit 1
+    }
+}
+
+
+if (params.bam) {
     ch_in = setup_input_channel_from_bam(params.bam)
 } else if (params.runfile) {
     ch_in = setup_input_channel_from_runfile(params.runfile)
 }
-
 
 // One input for fermi and one for manta
 ch_in_manta = ch_in.tap { ch_in_fermi }
