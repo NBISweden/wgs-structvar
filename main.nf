@@ -10,9 +10,9 @@ WGS Structural Variation Pipeline
 if (params.help) {
     usage_message()
     exit 0
-} else {
+} 
+
 check_input_params()
-}
 
 
 /* Figure out what steps to run */
@@ -25,26 +25,6 @@ workflowSteps = processWorkflowSteps(params.steps)
  *  Last two elements of the array is ALWAYS `uuid` and `outdir` in that
  * order.
  */
-
-def check_input_params() {
-    error = false
-    if (!params.project && workflow.profile != 'local') {
-        log.info('You need to specify what project to run under')
-        error = true
-    }
-    if (!params.bam && !params.runfile) {
-        log.info('You need to specify a bam or runfile file')
-        error = true
-    } else if (params.bam && params.runfile) {
-        log.info('You can only specify one of bam and runfile')
-        error = true
-    }
-    if (error) {
-        log.info('See --help for more information')
-        exit 1
-    }
-}
-
 
 if (params.bam) {
     ch_in = setup_input_channel_from_bam(params.bam)
@@ -470,6 +450,25 @@ def usage_message() {
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
     log.info ''
+}
+
+def check_input_params() {
+    error = false
+    if (!params.project && workflow.profile != 'local') {
+        log.info('You need to specify what project to run under')
+        error = true
+    }
+    if (!params.bam && !params.runfile) {
+        log.info('You need to specify a bam or runfile file')
+        error = true
+    } else if (params.bam && params.runfile) {
+        log.info('You can only specify one of bam and runfile')
+        error = true
+    }
+    if (error) {
+        log.info('See --help for more information')
+        exit 1
+    }
 }
 
 def startup_message() {
