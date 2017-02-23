@@ -434,8 +434,8 @@ process snpEff {
 // Utility functions
 
 def usage_message() {
-    log.info ''
-    log.info 'Usage:'
+    log.info 'WGS-structvar pipeline'
+    log.info 'USAGE:'
     log.info 'Run a local copy of the wgs-structvar WF:'
     log.info '    nextflow main.nf --bam <bamfile> [more options]'
     log.info 'OR run from github:'
