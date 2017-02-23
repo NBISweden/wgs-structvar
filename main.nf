@@ -10,7 +10,7 @@ WGS Structural Variation Pipeline
 if (params.help) {
     usage_message()
     exit 0
-} 
+}
 
 check_input_params()
 
