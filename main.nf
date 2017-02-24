@@ -67,9 +67,7 @@ process index_bamfile {
 
     script:
     """
-    if [[ ! -e "$bamindex" ]]; then
-        samtools index "$bamfile"
-    fi
+    samtools index "$bamfile"
     """
 }
 
@@ -132,9 +130,7 @@ process create_fastq {
 
     script:
     """
-    if [[ ! -e "$fastqfile" ]]; then
-        samtools bam2fq bamfile | gzip - > "$fastqfile"
-    fi
+    samtools bam2fq "$bamfile" | gzip - > "$fastqfile"
     """
 }
 
