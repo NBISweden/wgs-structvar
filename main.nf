@@ -349,8 +349,8 @@ process variant_effect_predictor {
     esac
 
     # VEP failes files without variants, but the pipeline should still run
-    if ! grep -qv '^#' \$INFILE; then
-        cp \$INFILE \$OUTFILE
+    if ! grep -qv '^#' "\$INFILE"; then
+        cp "\$INFILE" "\$OUTFILE"
         exit 0
     fi
 
@@ -371,7 +371,7 @@ process variant_effect_predictor {
         --total_length             \
         --canonical                \
         --ccds                     \
-        --fork \$SLURM_JOB_CPUS_PER_NODE \
+        --fork "\$SLURM_JOB_CPUS_PER_NODE" \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$ASSEMBLY" \
         --offline
