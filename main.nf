@@ -12,9 +12,7 @@ if (params.help) {
     exit 0
 }
 
-if (!params.project && workflow.profile != 'local') {
-    exit 1, 'You need to specify what project to run under, see --help for more information'
-}
+check_input_params()
 
 
 /* Figure out what steps to run */
@@ -27,16 +25,12 @@ workflowSteps = processWorkflowSteps(params.steps)
  *  Last two elements of the array is ALWAYS `uuid` and `outdir` in that
  * order.
  */
-if (!params.bam && !params.runfile) {
-    exit 1, 'You need to specify a bam or runfile file, see --help for more information'
-} else if (params.bam && params.runfile) {
-    exit 1, "You can only specify one of bam and runfile, see --help for more information"
-} else if (params.bam) {
+
+if (params.bam) {
     ch_in = setup_input_channel_from_bam(params.bam)
 } else if (params.runfile) {
     ch_in = setup_input_channel_from_runfile(params.runfile)
 }
-
 
 // One input for fermi and one for manta
 ch_in_manta = ch_in.tap { ch_in_fermi }
@@ -64,8 +58,7 @@ process index_bamfile {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.samtools"
@@ -74,9 +67,7 @@ process index_bamfile {
 
     script:
     """
-    if [[ ! -e "$bamindex" ]]; then
-        samtools index "$bamfile"
-    fi
+    samtools index "$bamfile"
     """
 }
 
@@ -92,9 +83,9 @@ process manta {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.runtime.caller * 2**(task.attempt-1) }
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller * 2 **(task.attempt-1) }
     maxRetries 3
-    queue 'node'
+    cpus 16 
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -129,8 +120,8 @@ process create_fastq {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.caller
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller }
 
     module 'bioinfo-tools'
     module "$params.modules.samtools"
@@ -139,9 +130,7 @@ process create_fastq {
 
     script:
     """
-    if [[ ! -e "$fastqfile" ]]; then
-        samtools bam2fq bamfile | gzip - > "$fastqfile"
-    fi
+    samtools bam2fq "$bamfile" | gzip - > "$fastqfile"
     """
 }
 
@@ -157,9 +146,9 @@ process fermikit {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { params.runtime.fermikit * 2**( task.attempt - 1 ) }
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.fermikit * 2**( task.attempt -1 ) }
     maxRetries 3
-    queue 'node'
+    cpus 16
 
     module 'bioinfo-tools'
     module "$params.modules.fermikit"
@@ -195,8 +184,8 @@ process mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -235,8 +224,8 @@ process intersect_files {
     tag "$uuid"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.bedtools"
@@ -292,8 +281,8 @@ process normalize_vcf {
     tag "$uuid - $infile"
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.vt"
@@ -337,9 +326,8 @@ process variant_effect_predictor {
     tag "$uuid - $infile"
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
-    executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    cpus 4
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.vep"
@@ -360,6 +348,12 @@ process variant_effect_predictor {
               exit 1;;
     esac
 
+    # VEP failes files without variants, but the pipeline should still run
+    if ! grep -qv '^#' "\$INFILE"; then
+        cp "\$INFILE" "\$OUTFILE"
+        exit 0
+    fi
+
     variant_effect_predictor.pl \
         -i "\$INFILE"              \
         --format "\$FORMAT"        \
@@ -377,6 +371,7 @@ process variant_effect_predictor {
         --total_length             \
         --canonical                \
         --ccds                     \
+        --fork "\$SLURM_JOB_CPUS_PER_NODE" \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$ASSEMBLY" \
         --offline
@@ -393,8 +388,8 @@ process snpEff {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
-    queue 'core'
-    time params.runtime.simple
+    
+    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
     module "$params.modules.snpeff"
@@ -415,31 +410,61 @@ process snpEff {
 // Utility functions
 
 def usage_message() {
-    log.info ''
-    log.info 'Usage:'
+    log.info 'WGS-structvar pipeline'
+    log.info 'USAGE:'
+    log.info 'Run a local copy of the wgs-structvar WF:'
     log.info '    nextflow main.nf --bam <bamfile> [more options]'
+    log.info 'OR run from github:'
+    log.info '    nextflow nbisweden/wgs-structvar --bam <bamfile> [more options]'
+    log.info ''
+    log.info 'The log file .nextflow.log will be produced when running and can be monitored'
+    log.info 'by e.g. tail -f .nextflow.log'
+    log.info 'More information about this pipeline can be found on:'
+    log.info 'https://github.com/NBISweden/wgs-structvar'
     log.info ''
     log.info 'Options:'
     log.info '  Required'
     log.info '    --bam           Input bamfile'
     log.info '       OR'
-    log.info '    --runfile       Input runfile, whitespace separated, first column is bam file'
+    log.info '    --runfile       Input runfile for multiple bamfiles in the same run.'
+    log.info '                    Whitespace separated, first column is bam file,'
     log.info '                    second column is output directory and an optional third column'
     log.info '                    with a run id to more easily keep track of the run (otherwise'
     log.info '                    it\'s autogenerated).'
     log.info '    --project       Uppmax project to log cluster time to'
+    log.info '       OR'
+    log.info '    -profile local  Run locally, only for very small datasets'
     log.info '  Optional'
-    log.info '     (default values in parenthesis where applicable)'
     log.info '    --help          Show this message and exit'
+    log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
     log.info '                    Used by fermikit, will be created from the bam file if'
     log.info '                    missing.'
-    log.info '    --fastq         Input fastqfile (default is bam but with fq as fileending)'
-    log.info '    --steps         Specify what steps to run, comma separated:'
+    log.info '    --steps         Specify what steps to run, comma separated: (default: manta, vep)'
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
-    log.info '    --outdir        Directory where resultfiles are stored (results)'
-    log.info '    --prefix        Prefix for result filenames (empty)'
+    log.info '                Extra: normalize (with vt)'
+    log.info '    --outdir        Directory where resultfiles are stored (default: results)'
+    log.info '    --prefix        Prefix for result filenames (default: no prefix)'
     log.info ''
+}
+
+def check_input_params() {
+    error = false
+    if (!params.project && workflow.profile != 'local') {
+        log.info('You need to specify what project to run under')
+        error = true
+    }
+    if (!params.bam && !params.runfile) {
+        log.info('You need to specify a bam or runfile file')
+        error = true
+    } else if (params.bam && params.runfile) {
+        log.info('You can only specify one of bam and runfile')
+        error = true
+    }
+    if (error) {
+        log.info('See --help for more information')
+        exit 1
+    }
 }
 
 def startup_message() {
@@ -540,8 +565,12 @@ def nextflow_running_as_slurmjob() {
 }
 
 /* If the nextflow deamon is running as a slurm job, we can use the local CPU
- * for a lot of our work */
+ * for a lot of our work, this overrides the slurm executor specified in 
+ * the -profile command line option */
 def choose_executor() {
+    if (workflow.profile == 'local') {
+        return 'local'
+    }
     return nextflow_running_as_slurmjob() ? 'local' : 'slurm'
 }
 
