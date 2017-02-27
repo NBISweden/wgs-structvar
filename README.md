@@ -113,7 +113,7 @@ and other supporting `simple` single-core jobs.
 
 ## Support
 
-If you need help with this module, please call 1-800-NBISFIXIT-PLACEHOLDER
+If you need help with this module, please create a [support issue](https://github.com/NBISweden/wgs-structvar/issues/new?title=Support) in github.
 
 ## External links
 
