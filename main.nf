@@ -473,13 +473,14 @@ def startup_message() {
     log.info "======================"
     log.info "WGS-structvar pipeline"
     log.info "======================"
-    log.info "Bamfile    : $params.bam"
-    log.info "Scriptdir  : $baseDir"
-    log.info "Revision   : $revision"
-    log.info "Work dir   : $workDir"
-    log.info "Output dir : $params.outdir"
-    log.info "Project    : $params.project"
-    log.info "Will run   : " + workflowSteps.join(", ")
+    log.info "Command line : $workflow.commandLine"
+    log.info "Bamfile      : $params.bam"
+    log.info "Scriptdir    : $baseDir"
+    log.info "Revision     : $revision"
+    log.info "Work dir     : $workDir"
+    log.info "Output dir   : $params.outdir"
+    log.info "Project      : $params.project"
+    log.info "Will run     : " + workflowSteps.join(", ")
     log.info ""
 }
 
