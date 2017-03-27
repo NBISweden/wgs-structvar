@@ -85,7 +85,7 @@ process manta {
     errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
     time { workflow.profile == 'devel' ? '1h' : params.runtime.caller * 2 **(task.attempt-1) }
     maxRetries 3
-    cpus 16 
+    cpus 16
 
     module 'bioinfo-tools'
     module "$params.modules.manta"
@@ -120,7 +120,7 @@ process create_fastq {
     tag "$uuid"
 
     executor choose_executor()
-    
+
     time { workflow.profile == 'devel' ? '1h' : params.runtime.caller }
 
     module 'bioinfo-tools'
@@ -184,7 +184,7 @@ process mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    
+
     time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
@@ -224,7 +224,7 @@ process intersect_files {
     tag "$uuid"
 
     executor choose_executor()
-    
+
     time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
@@ -281,7 +281,7 @@ process normalize_vcf {
     tag "$uuid - $infile"
 
     executor choose_executor()
-    
+
     time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
@@ -388,7 +388,7 @@ process snpEff {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
-    
+
     time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
 
     module 'bioinfo-tools'
@@ -512,24 +512,7 @@ def setup_input_channel_from_bam(bf) {
 }
 
 def grab_git_revision() {
-    if ( workflow.commitId ) { // it's run directly from github
-        return workflow.commitId
-    }
-
-    // Try to find the revision directly from git
-    head_pointer_file = file("${baseDir}/.git/HEAD")
-    if ( ! head_pointer_file.exists() ) {
-        return ''
-    }
-    ref = head_pointer_file.newReader().readLine().tokenize()[1]
-
-    ref_file = file("${baseDir}/.git/$ref")
-    if ( ! ref_file.exists() ) {
-        return ''
-    }
-    revision = ref_file.newReader().readLine()
-
-    return revision
+	return workflow.revision ?: workflow.scriptId.substring(0,10)
 }
 
 def infer_bam_index_from_bam(f) {
@@ -565,7 +548,7 @@ def nextflow_running_as_slurmjob() {
 }
 
 /* If the nextflow deamon is running as a slurm job, we can use the local CPU
- * for a lot of our work, this overrides the slurm executor specified in 
+ * for a lot of our work, this overrides the slurm executor specified in
  * the -profile command line option */
 def choose_executor() {
     if (workflow.profile == 'local') {
