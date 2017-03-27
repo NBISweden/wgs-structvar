@@ -58,10 +58,6 @@ process index_bamfile {
     tag "$uuid"
 
     executor choose_executor()
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
-
-    module 'bioinfo-tools'
-    module "$params.modules.samtools"
 
     when: 'manta' in workflowSteps
 
@@ -81,14 +77,6 @@ process manta {
 
     tag "$uuid"
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
-
-    errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller * 2 **(task.attempt-1) }
-    maxRetries 3
-    cpus 16
-
-    module 'bioinfo-tools'
-    module "$params.modules.manta"
 
     when: 'manta' in workflowSteps
 
@@ -121,11 +109,6 @@ process create_fastq {
 
     executor choose_executor()
 
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.caller }
-
-    module 'bioinfo-tools'
-    module "$params.modules.samtools"
-
     when: 'fermikit' in workflowSteps
 
     script:
@@ -144,17 +127,6 @@ process fermikit {
 
     tag "$uuid"
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
-
-    errorStrategy { task.exitStatus == 143 ? 'retry' : 'terminate' }
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.fermikit * 2**( task.attempt -1 ) }
-    maxRetries 3
-    cpus 16
-
-    module 'bioinfo-tools'
-    module "$params.modules.fermikit"
-    module "$params.modules.samtools"
-    module "$params.modules.vcftools"
-    module "$params.modules.tabix"
 
     when: 'fermikit' in workflowSteps
 
@@ -184,11 +156,6 @@ process mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
-
-    module 'bioinfo-tools'
-    module "$params.modules.bedtools"
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
@@ -224,11 +191,6 @@ process intersect_files {
     tag "$uuid"
 
     executor choose_executor()
-
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
-
-    module 'bioinfo-tools'
-    module "$params.modules.bedtools"
 
     when: 'make_intersect' in workflowSteps
 
@@ -280,11 +242,6 @@ process normalize_vcf {
 
     executor choose_executor()
 
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
-
-    module 'bioinfo-tools'
-    module "$params.modules.vt"
-
     """
     INFILE="$infile"
     OUTFILE="\${INFILE%.vcf}.vt.vcf"
@@ -323,12 +280,6 @@ process variant_effect_predictor {
 
     tag "$uuid - $infile"
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
-
-    cpus 4
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
-
-    module 'bioinfo-tools'
-    module "$params.modules.vep"
 
     when: 'vep' in workflowSteps
 
@@ -386,12 +337,6 @@ process snpEff {
     publishDir "$dir", mode: 'copy', saveAs: { "$params.prefix$it" }
 
     executor choose_executor()
-
-    time { workflow.profile == 'devel' ? '1h' : params.runtime.simple }
-
-    module 'bioinfo-tools'
-    module "$params.modules.snpeff"
-    module "$params.modules.vt"
 
     when: 'snpeff' in workflowSteps
 
