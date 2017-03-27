@@ -260,8 +260,6 @@ process intersect_files {
     """
 }
 
-ch_normalize_vcf = Channel.create()
-
 if ( 'normalize' in workflowSteps ) {
     ch_masked_vcfs_vep.mix( ch_intersections ).set { ch_normalize_vcf }
 }
@@ -269,7 +267,7 @@ else {
     ch_masked_vcfs_vep.mix( ch_intersections ).set { ch_annotate }
 
     // So we don't get stuck in an infinite loop
-    ch_normalize_vcf.close()
+    Channel.empty().set { ch_normalize_vcf }
 }
 
 process normalize_vcf {
