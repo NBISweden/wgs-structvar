@@ -41,19 +41,26 @@ startup_message()
 // 1. Run manta
 
 // Add bamindex path to the channel and generate indexes if they're missing
+ch_bamfile = Channel.create()
 ch_index_bam = Channel.create()
 ch_already_indexed = Channel.create()
 
 ch_in_manta.map {
         index = infer_bam_index_from_bam(it[0])
         [ it[0], file(index), it[1], it[2] ]
-    }.choice(ch_index_bam, ch_already_indexed) { it[1].exists() ? 1 : 0 }
+    }.choice(ch_bamfile, ch_already_indexed) { it[1].exists() ? 1 : 0 }
+
+// Remove bam index filename from channel map so it doesnt get produced in the working dir
+// by the process index_bamfile
+ch_bamfile.map {
+        [ it[0], it[2], it[3] ]
+    }.into(ch_index_bam)
 
 process index_bamfile {
     input:
-        set file(bamfile), file(bamindex), val(uuid), val(dir) from ch_index_bam
+        set file(bamfile), val(uuid), val(dir) from ch_index_bam
     output:
-        set file(bamfile), file(bamindex), val(uuid), val(dir) into ch_indexed_bam
+        set file(bamfile), file('*.bam.bai'), val(uuid), val(dir) into ch_indexed_bam
 
     tag "$uuid"
 
@@ -90,20 +97,26 @@ process manta {
 }
 
 // 2. Run fermikit
-
+ch_bamfile_2fastq = Channel.create()
 ch_create_fastq = Channel.create()
 ch_has_fastq = Channel.create()
 
 ch_in_fermi.map {
         fastqfile = infer_fastq_from_bam(it[0])
         [ it[0], file(fastqfile), it[1], it[2] ]
-    }.choice( ch_create_fastq, ch_has_fastq ) { it[1].exists() ? 1 : 0 }
+    }.choice( ch_bamfile_2fastq, ch_has_fastq ) { it[1].exists() ? 1 : 0 }
+
+// Remove fastq file from input so it is not produced in current (launch) dir
+// by create_fastq, but instead it will be in a workdir
+ch_bamfile_2fastq.map {
+        [ it[0], it[2], it[3] ]
+    }.into(ch_create_fastq)
 
 process create_fastq {
     input:
-        set file(bamfile), file(fastqfile), val(uuid), val(dir) from ch_create_fastq
+        set file(bamfile), val(uuid), val(dir) from ch_create_fastq
     output:
-        set file(fastqfile), val(uuid), val(dir) into ch_created_fastq
+        set file('fastq.fq.gz'), val(uuid), val(dir) into ch_created_fastq
 
     tag "$uuid"
 
@@ -113,7 +126,7 @@ process create_fastq {
 
     script:
     """
-    samtools bam2fq "$bamfile" | gzip - > "$fastqfile"
+    samtools bam2fq "$bamfile" | gzip - > fastq.fq.gz
     """
 }
 
