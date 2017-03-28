@@ -191,19 +191,19 @@ process artifact_mask_vcfs {
 }
 
 
-if ( params.sweref_mask ) {
-    sweref_mask_dir = file("$baseDir/sweref_masks")
-    ch_artifact_masked_vcfs.into(ch_swerefmask_in)
+if ( params.swegen_mask ) {
+    swegen_mask_dir = file("$baseDir/swegen_masks")
+    ch_artifact_masked_vcfs.into(ch_swegenmask_in)
     reciprocal = params.no_sr_reciprocal ? '': '-r'
 } else {
     ch_artifact_masked_vcfs.into(ch_masked_vcfs)
 }
 
 
-process sweref_mask_vcfs {
+process swegen_mask_vcfs {
     input:
-        each sweref_mask_dir from sweref_mask_dir
-        set file(svfile), val(uuid), val(dir) from ch_swerefmask_in
+        each swegen_mask_dir from swegen_mask_dir
+        set file(svfile), val(uuid), val(dir) from ch_swegenmask_in
     output:
         set file('*_masked.vcf'), val(uuid), val(dir) into ch_masked_vcfs
 
@@ -214,7 +214,7 @@ process sweref_mask_vcfs {
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
     MASK_FILE=\${BNAME}_masked.vcf
-    MASK_DIR=$mask_dir
+    MASK_DIR=$swegen_mask_dir
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
