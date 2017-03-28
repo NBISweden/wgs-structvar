@@ -187,6 +187,7 @@ process artifact_mask_vcfs {
 
 
 ch_noswegen_mask = ch_artifact_masked_vcfs.tap { ch_swegen_mask_in }
+reciprocal = params.no_sr_reciprocal ? '': '-r'
 
 process swegen_mask_vcfs {
     input:
@@ -197,7 +198,7 @@ process swegen_mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    reciprocal = params.no_sr_reciprocal ? '': '-r'
+    when params.swegen_mask
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
@@ -216,12 +217,7 @@ process swegen_mask_vcfs {
     """
 }
 
-ch_masked_vcfs = Channel.create()
-if ( !params.swegen_mask ) {
-    ch_noswegen_mask.into(ch_masked_vcfs)
-} else {
-    ch_swegen_masked_vcfs.into(ch_masked_vcfs)
-}
+ch_masked_vcfs = ch_noswegen_mask.mix(ch_swegen_masked_vcfs)
 
 // To make intersect files we need to combine them into one channel with
 // toList() and then sort in the map so that fermi is before manta in the
