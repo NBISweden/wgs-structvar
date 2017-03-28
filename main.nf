@@ -171,7 +171,8 @@ process artifact_mask_vcfs {
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
     MASK_FILE=\${BNAME}_masked.vcf
-    MASK_DIR=$mask_dirs.masks_artifacts
+    BASE_DIR=$baseDir
+    MASK_DIR=$params.mask_dirs.masks_artifacts
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
@@ -201,7 +202,8 @@ process swegen_mask_vcfs {
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
     MASK_FILE=\${BNAME}_masked.vcf
-    MASK_DIR=$mask_dirs.masks_filters
+    BASE_DIR=$baseDir
+    MASK_DIR=$params.mask_dirs.masks_filters
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
