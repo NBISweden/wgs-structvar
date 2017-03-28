@@ -185,23 +185,18 @@ process artifact_mask_vcfs {
 }
 
 
-if ( params.swegen_mask ) {
-    ch_artifact_masked_vcfs.into(ch_swegenmask_in)
-    reciprocal = params.no_sr_reciprocal ? '': '-r'
-} else {
-    ch_artifact_masked_vcfs.into(ch_masked_vcfs)
-}
-
+ch_noswegen_mask = ch_artifact_masked_vcfs.tap { ch_swegen_mask_in }
 
 process swegen_mask_vcfs {
     input:
-        set file(svfile), val(uuid), val(dir) from ch_swegenmask_in
+        set file(svfile), val(uuid), val(dir) from ch_swegen_mask_in
     output:
-        set file('*_masked.vcf'), val(uuid), val(dir) into ch_masked_vcfs
+        set file('*_masked.vcf'), val(uuid), val(dir) into ch_swegen_masked_vcfs
 
     tag "$uuid $svfile"
 
     executor choose_executor()
+    reciprocal = params.no_sr_reciprocal ? '': '-r'
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
@@ -217,6 +212,13 @@ process swegen_mask_vcfs {
     done
     mv workfile \$MASK_FILE
     """
+}
+
+ch_masked_vcfs = Channel.create()
+if ( !params.swegen_mask ) {
+    ch_noswegen_mask.into(ch_masked_vcfs)
+} else {
+    ch_swegen_masked_vcfs.into(ch_masked_vcfs)
 }
 
 // To make intersect files we need to combine them into one channel with
