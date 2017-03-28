@@ -161,11 +161,6 @@ ch_vcfs = ch_manta_vcf.mix( ch_fermi_vcf )
 
 process artifact_mask_vcfs {
     input:
-        // why do we use each? there is only one mask_dir
-        // also, variable reuse? I am a bit unsure about
-        // scope in nextflow though, but would like to change
-        // the each item to mask_dir and keep the collection name
-        each artifact_mask_dir from artifact_mask_dir
         set file(svfile), val(uuid), val(dir) from ch_vcfs
     output:
         set file('*_masked.vcf'), val(uuid), val(dir) into ch_artifact_masked_vcfs
@@ -202,7 +197,6 @@ if ( params.swegen_mask ) {
 
 process swegen_mask_vcfs {
     input:
-        each swegen_mask_dir from swegen_mask_dir
         set file(svfile), val(uuid), val(dir) from ch_swegenmask_in
     output:
         set file('*_masked.vcf'), val(uuid), val(dir) into ch_masked_vcfs
