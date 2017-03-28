@@ -156,13 +156,54 @@ process fermikit {
 
 // 3. Create summary files
 
-mask_dir = file("$baseDir/masks")
+artifact_mask_dir = file("$baseDir/masks")
 ch_vcfs = ch_manta_vcf.mix( ch_fermi_vcf )
 
-process mask_vcfs {
+process artifact_mask_vcfs {
     input:
-        each mask_dir from mask_dir
+        // why do we use each? there is only one mask_dir
+        // also, variable reuse? I am a bit unsure about
+        // scope in nextflow though, but would like to change
+        // the each item to mask_dir and keep the collection name
+        each artifact_mask_dir from artifact_mask_dir
         set file(svfile), val(uuid), val(dir) from ch_vcfs
+    output:
+        set file('*_masked.vcf'), val(uuid), val(dir) into ch_artifact_masked_vcfs
+
+    tag "$uuid $svfile"
+
+    executor choose_executor()
+
+    """
+    BNAME=\$( echo $svfile | cut -d. -f1 )
+    MASK_FILE=\${BNAME}_masked.vcf
+    MASK_DIR=$artifact_mask_dir
+
+    cp $svfile workfile
+    for mask in \$MASK_DIR/*; do
+        cat workfile \
+            | bedtools intersect -header -v -a stdin -b \$mask -f 0.25 \
+            > tempfile
+        mv tempfile workfile
+    done
+    mv workfile \$MASK_FILE
+    """
+}
+
+
+if ( params.sweref_mask ) {
+    sweref_mask_dir = file("$baseDir/sweref_masks")
+    ch_artifact_masked_vcfs.into(ch_swerefmask_in)
+    reciprocal = params.no_sr_reciprocal ? '': '-r'
+} else {
+    ch_artifact_masked_vcfs.into(ch_masked_vcfs)
+}
+
+
+process sweref_mask_vcfs {
+    input:
+        each sweref_mask_dir from sweref_mask_dir
+        set file(svfile), val(uuid), val(dir) from ch_swerefmask_in
     output:
         set file('*_masked.vcf'), val(uuid), val(dir) into ch_masked_vcfs
 
@@ -178,14 +219,13 @@ process mask_vcfs {
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
         cat workfile \
-            | bedtools intersect -header -v -a stdin -b \$mask -f 0.25 \
+            | bedtools intersect -header -v -a stdin -b \$mask -f $params.sr_mask_ovlp $reciprocal \
             > tempfile
         mv tempfile workfile
     done
     mv workfile \$MASK_FILE
     """
 }
-
 
 // To make intersect files we need to combine them into one channel with
 // toList() and then sort in the map so that fermi is before manta in the
