@@ -156,7 +156,6 @@ process fermikit {
 
 // 3. Create summary files
 
-artifact_mask_dir = file("$baseDir/masks")
 ch_vcfs = ch_manta_vcf.mix( ch_fermi_vcf )
 
 process artifact_mask_vcfs {
@@ -172,7 +171,7 @@ process artifact_mask_vcfs {
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
     MASK_FILE=\${BNAME}_masked.vcf
-    MASK_DIR=$artifact_mask_dir
+    MASK_DIR=$mask_dirs.masks_artifacts
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
@@ -187,7 +186,6 @@ process artifact_mask_vcfs {
 
 
 if ( params.swegen_mask ) {
-    swegen_mask_dir = file("$baseDir/swegen_masks")
     ch_artifact_masked_vcfs.into(ch_swegenmask_in)
     reciprocal = params.no_sr_reciprocal ? '': '-r'
 } else {
@@ -208,7 +206,7 @@ process swegen_mask_vcfs {
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
     MASK_FILE=\${BNAME}_masked.vcf
-    MASK_DIR=$swegen_mask_dir
+    MASK_DIR=$mask_dirs.masks_filters
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
