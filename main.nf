@@ -186,7 +186,7 @@ process artifact_mask_vcfs {
 
 
 ch_noswegen_mask = ch_artifact_masked_vcfs.tap { ch_swegen_mask_in }
-reciprocal = params.no_sr_reciprocal ? '': '-r'
+reciprocal = params.no_sg_reciprocal ? '': '-r'
 
 process swegen_mask_vcfs {
     input:
@@ -207,7 +207,7 @@ process swegen_mask_vcfs {
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
         cat workfile \
-            | bedtools intersect -header -v -a stdin -b \$mask -f $params.sr_mask_ovlp $reciprocal \
+            | bedtools intersect -header -v -a stdin -b \$mask -f $params.sg_mask_ovlp $reciprocal \
             > tempfile
         mv tempfile workfile
     done
