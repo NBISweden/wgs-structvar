@@ -162,7 +162,7 @@ process artifact_mask_vcfs {
     input:
         set file(svfile), val(uuid), val(dir) from ch_vcfs
     output:
-        set file('*_masked.vcf'), val(uuid), val(dir) into ch_artifact_masked_vcfs
+        set file('*_artifact_masked.vcf'), val(uuid), val(dir) into ch_artifact_masked_vcfs
 
     tag "$uuid $svfile"
 
@@ -170,7 +170,7 @@ process artifact_mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.vcf
+    MASK_FILE=\${BNAME}_artifact_masked.vcf
     MASK_DIR=$params.mask_dirs.masks_artifacts
 
     cp $svfile workfile
@@ -192,7 +192,7 @@ process swegen_mask_vcfs {
     input:
         set file(svfile), val(uuid), val(dir) from ch_swegen_mask_in
     output:
-        set file('*_masked.vcf'), val(uuid), val(dir) into ch_swegen_masked_vcfs
+        set file('*_swegen_masked.vcf'), val(uuid), val(dir) into ch_swegen_masked_vcfs
 
     tag "$uuid $svfile"
 
@@ -201,7 +201,7 @@ process swegen_mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.vcf
+    MASK_FILE=\${BNAME}_swegen_masked.vcf
     MASK_DIR=$params.mask_dirs.masks_filters
 
     cp $svfile workfile
@@ -229,7 +229,7 @@ process intersect_files {
     input:
         set file(vcfs), val(uuid), val(dir) from ch_intersect_input
     output:
-        set file('combined_masked.vcf'), val(uuid), val("${dir[0]}") into ch_intersections
+        set file('combined_*.vcf'), val(uuid), val("${dir[0]}") into ch_intersections
 
     tag "$uuid"
 
@@ -246,22 +246,23 @@ process intersect_files {
         fermi_vcf=${vcfs[1]}
         manta_vcf=${vcfs[0]}
     fi
-
+    
+    OUTNAME=`basename \$fermi_vcf|sed 's/fermikit_//;s/.vcf//'`
     ## Create intersected vcf files
     for WORD in DEL INS DUP; do
         intersectBed -a <( grep -w "^#.\\+\\|\$WORD" \$fermi_vcf) \
                      -b <( grep -w "^#.\\+\\|\$WORD" \$manta_vcf) \
             -f 0.5 -r \
-            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.vcf
+            | sort -k1,1V -k2,2n > cmb_\${OUTNAME}_\${WORD,,}.vcf
     done
 
     cat <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' \$fermi_vcf ) \
         <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' \$manta_vcf ) \
         | cut -f 1-8 \
-        | sort -k1,1V -k2,2n > combined_masked_OTHER.vcf
+        | sort -k1,1V -k2,2n > cmb_\${OUTNAME}_OTHER.vcf
 
     ( grep '^#' \$fermi_vcf; \
-        sort -k1,1V -k2,2n combined_masked_*.vcf ) >> combined_masked.vcf
+        sort -k1,1V -k2,2n cmb_\${OUTNAME}_*.vcf ) >> combined_\${OUTNAME}.vcf
     """
 }
 
