@@ -170,7 +170,6 @@ process artifact_mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_artifact_masked.vcf
     MASK_DIR=$params.mask_dirs.masks_artifacts
 
     # We don't want to change the filename in this process so we copy the
