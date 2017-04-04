@@ -246,7 +246,7 @@ process intersect_files {
         fermi_vcf=${vcfs[1]}
         manta_vcf=${vcfs[0]}
     fi
-    
+
     OUTNAME=`basename \$fermi_vcf|sed 's/fermikit_//;s/.vcf//'`
     ## Create intersected vcf files
     for WORD in DEL INS DUP; do
