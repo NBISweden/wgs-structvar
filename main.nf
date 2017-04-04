@@ -162,7 +162,7 @@ process artifact_mask_vcfs {
     input:
         set file(svfile), val(uuid), val(dir) from ch_vcfs
     output:
-        set file('*_artifact_masked.vcf'), val(uuid), val(dir) into ch_artifact_masked_vcfs
+        set file(svfile), val(uuid), val(dir) into ch_artifact_masked_vcfs
 
     tag "$uuid $svfile"
 
@@ -173,7 +173,11 @@ process artifact_mask_vcfs {
     MASK_FILE=\${BNAME}_artifact_masked.vcf
     MASK_DIR=$params.mask_dirs.masks_artifacts
 
+    # We don't want to change the filename in this process so we copy the
+    # infile and remove the symbolic link. And then recreate the file at the
+    # end.
     cp $svfile workfile
+    rm $svfile # It's a link, should be ok :)
     for mask in \$MASK_DIR/*; do
         if [ ! -f "\$mask" ]; then
             break
@@ -183,7 +187,7 @@ process artifact_mask_vcfs {
             > tempfile
         mv tempfile workfile
     done
-    mv workfile \$MASK_FILE
+    mv workfile $svfile
     """
 }
 
