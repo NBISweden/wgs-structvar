@@ -203,7 +203,7 @@ process swegen_mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    when params.swegen_mask
+    when 'filter' in workflowSteps
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
@@ -438,7 +438,8 @@ def usage_message() {
     log.info '    --steps         Specify what steps to run, comma separated: (default: manta, vep)'
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
-    log.info '                Extra: normalize (with vt)'
+    log.info '                Extra: normalize (with vt),'
+    log.info '                       filter (with bed files in masks_filters/, by default swegen is used)'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
     log.info ''
