@@ -175,6 +175,9 @@ process artifact_mask_vcfs {
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
+        if [ ! -f "\$mask" ]; then
+            break
+        fi
         cat workfile \
             | bedtools intersect -header -v -a stdin -b \$mask -f 0.25 \
             > tempfile
@@ -206,6 +209,9 @@ process swegen_mask_vcfs {
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
+        if [ ! -f "\$mask" ]; then
+            break
+        fi
         cat workfile \
             | bedtools intersect -header -v -a stdin -b \$mask -f $params.sg_mask_ovlp $reciprocal \
             > tempfile
