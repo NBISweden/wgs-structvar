@@ -370,7 +370,7 @@ process variant_effect_predictor {
         --total_length             \
         --canonical                \
         --ccds                     \
-        --fork "\$SLURM_JOB_CPUS_PER_NODE" \
+        "\$( test "\$SLURM_CPUS_ON_NODE" -gt 1 && echo "--fork \$SLURM_CPUS_ON_NODE" )" \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$ASSEMBLY" \
         --offline
