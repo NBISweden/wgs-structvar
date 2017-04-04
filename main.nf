@@ -156,15 +156,13 @@ process fermikit {
 
 // 3. Create summary files
 
-mask_dir = file("$baseDir/masks")
 ch_vcfs = ch_manta_vcf.mix( ch_fermi_vcf )
 
-process mask_vcfs {
+process artifact_mask_vcfs {
     input:
-        each mask_dir from mask_dir
         set file(svfile), val(uuid), val(dir) from ch_vcfs
     output:
-        set file('*_masked.vcf'), val(uuid), val(dir) into ch_masked_vcfs
+        set file(svfile), val(uuid), val(dir) into ch_artifact_masked_vcfs
 
     tag "$uuid $svfile"
 
@@ -172,13 +170,53 @@ process mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_masked.vcf
-    MASK_DIR=$mask_dir
+    MASK_DIR=$params.mask_dirs.masks_artifacts
+
+    # We don't want to change the filename in this process so we copy the
+    # infile and remove the symbolic link. And then recreate the file at the
+    # end.
+    cp $svfile workfile
+    rm $svfile # It's a link, should be ok :)
+    for mask in \$MASK_DIR/*; do
+        if [ ! -f "\$mask" ]; then
+            break
+        fi
+        cat workfile \
+            | bedtools intersect -header -v -a stdin -b \$mask -f 0.25 \
+            > tempfile
+        mv tempfile workfile
+    done
+    mv workfile $svfile
+    """
+}
+
+
+ch_noswegen_mask = ch_artifact_masked_vcfs.tap { ch_swegen_mask_in }
+reciprocal = params.no_sg_reciprocal ? '': '-r'
+
+process swegen_mask_vcfs {
+    input:
+        set file(svfile), val(uuid), val(dir) from ch_swegen_mask_in
+    output:
+        set file('*_swegen_masked.vcf'), val(uuid), val(dir) into ch_swegen_masked_vcfs
+
+    tag "$uuid $svfile"
+
+    executor choose_executor()
+    when 'filter' in workflowSteps
+
+    """
+    BNAME=\$( echo $svfile | cut -d. -f1 )
+    MASK_FILE=\${BNAME}_swegen_masked.vcf
+    MASK_DIR=$params.mask_dirs.masks_filters
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
+        if [ ! -f "\$mask" ]; then
+            break
+        fi
         cat workfile \
-            | bedtools intersect -header -v -a stdin -b \$mask -f 0.25 \
+            | bedtools intersect -header -v -a stdin -b \$mask -f $params.sg_mask_ovlp $reciprocal \
             > tempfile
         mv tempfile workfile
     done
@@ -186,6 +224,7 @@ process mask_vcfs {
     """
 }
 
+ch_masked_vcfs = ch_noswegen_mask.mix(ch_swegen_masked_vcfs)
 
 // To make intersect files we need to combine them into one channel with
 // toList() and then sort in the map so that fermi is before manta in the
@@ -199,7 +238,7 @@ process intersect_files {
     input:
         set file(vcfs), val(uuid), val(dir) from ch_intersect_input
     output:
-        set file('combined_masked.vcf'), val(uuid), val("${dir[0]}") into ch_intersections
+        set file('combined_*.vcf'), val(uuid), val("${dir[0]}") into ch_intersections
 
     tag "$uuid"
 
@@ -217,21 +256,22 @@ process intersect_files {
         manta_vcf=${vcfs[0]}
     fi
 
+    OUTNAME=`basename \$fermi_vcf|sed 's/fermikit_//;s/.vcf//'`
     ## Create intersected vcf files
     for WORD in DEL INS DUP; do
         intersectBed -a <( grep -w "^#.\\+\\|\$WORD" \$fermi_vcf) \
                      -b <( grep -w "^#.\\+\\|\$WORD" \$manta_vcf) \
             -f 0.5 -r \
-            | sort -k1,1V -k2,2n > combined_masked_\${WORD,,}.vcf
+            | sort -k1,1V -k2,2n > cmb_\${OUTNAME}_\${WORD,,}.vcf
     done
 
     cat <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' \$fermi_vcf ) \
         <( grep -v -w '^#.\\+\\|DEL\\|INS\\|DUP' \$manta_vcf ) \
         | cut -f 1-8 \
-        | sort -k1,1V -k2,2n > combined_masked_OTHER.vcf
+        | sort -k1,1V -k2,2n > cmb_\${OUTNAME}_OTHER.vcf
 
     ( grep '^#' \$fermi_vcf; \
-        sort -k1,1V -k2,2n combined_masked_*.vcf ) >> combined_masked.vcf
+        sort -k1,1V -k2,2n cmb_\${OUTNAME}_*.vcf ) >> combined_\${OUTNAME}.vcf
     """
 }
 
@@ -333,7 +373,7 @@ process variant_effect_predictor {
         --total_length             \
         --canonical                \
         --ccds                     \
-        --fork "\$SLURM_JOB_CPUS_PER_NODE" \
+        \$( test "\$SLURM_CPUS_ON_NODE" -gt 1 && echo "--fork \$SLURM_CPUS_ON_NODE" ) \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$ASSEMBLY" \
         --offline
@@ -398,7 +438,10 @@ def usage_message() {
     log.info '    --steps         Specify what steps to run, comma separated: (default: manta, vep)'
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
-    log.info '                Extra: normalize (with vt)'
+    log.info '                Extra: normalize (with vt),'
+    log.info '                       filter (with bed files in masks_filters/, by default swegen is used)'
+    log.info '    --sg_mask_ovlp  Fractional overlap for use with the filter option'
+    log.info '    --no_sg_reciprocal  Don't use a reciprocal overlap for the filter option'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
     log.info ''
