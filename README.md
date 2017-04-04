@@ -65,7 +65,10 @@ Options:
     --steps         Specify what steps to run, comma separated: (default: manta, vep)
                 Callers: manta, fermikit
                 Annotation: vep, snpeff
-                Extra: normalize (with vt)
+                Extra: normalize (with vt),
+                       filter (with bed files in masks_filters/, by default swegen is used)
+    --sg_mask_ovlp  Fractional overlap for use with the filter option
+    --no_sg_reciprocal  Don't use a reciprocal overlap for the filter option
     --outdir        Directory where resultfiles are stored (default: results)
     --prefix        Prefix for result filenames (default: no prefix)
 ```
@@ -101,14 +104,23 @@ usage message for information on them.
 The next section has the reference assembly to use, both as fasta and assembly
 name.
 
-You may want to use different versions of the modules used by this workflow, and
-the `modules` section contains all of them and their
-versions. Customize the modules here, NOT in the `main.nf` file. 
+You may want to use different versions of the modules used by this workflow,
+currently you will have to edit the profiles to do that. On uppmax we have the
+milou profile which specifies all the modules and versions, see the
+`config/milou.config`.
 
-Finally the `runtime` section has the different runtimes for the different
-parts of the workflow. `fermikit` has it's own timespec since that is a very
-long running program, otherwise the workflow differentiates between `callers`
-and other supporting `simple` single-core jobs.
+The runtimes of the different programs is set in the `config/standard.config`
+file. That file also specifies how to deal with errors and the interaction
+with the Slurm scheduler, you probably don't want to change those unless you
+know what you are doing.
+
+The two folders `masks_artifacts` and `masks_filters` contain bed files to
+filter the vcf-files from the callers. The artifact directory contains files
+that should mask out problematic regions, it removes everything that has an
+overlaps at least 25% with a region in the artifact mask. The filter one is
+for more stringent filtering of already known variants, and here the default
+filter threshold is instead a reciprocal overlap of 95%. It can be customized
+with the two options `sg_mask_ovlp` (default 0.95) and `no_sg_reciprocal`.
 
 
 ## Support

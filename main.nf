@@ -440,6 +440,8 @@ def usage_message() {
     log.info '                Annotation: vep, snpeff'
     log.info '                Extra: normalize (with vt),'
     log.info '                       filter (with bed files in masks_filters/, by default swegen is used)'
+    log.info '    --sg_mask_ovlp  Fractional overlap for use with the filter option'
+    log.info '    --no_sg_reciprocal  Don't use a reciprocal overlap for the filter option'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
     log.info ''
