@@ -71,9 +71,9 @@ Options:
     --no_sg_reciprocal  Don't use a reciprocal overlap for the filter option
     --outdir        Directory where resultfiles are stored (default: results)
     --prefix        Prefix for result filenames (default: no prefix)
-    --mask_dir_artifacts
+    --mask_artifacts_dir
                     Directory with bed files for artifact filtering (default: mask_artifacts)
-    --mask_dir_cohort
+    --mask_cohort_dir
                     Directory with bed files for cohort filtering (default: mask_cohort)
 ```
 

@@ -170,7 +170,7 @@ process artifact_mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_DIR=$params.mask_dir_artifacts
+    MASK_DIR=$params.mask_artifacts_dir
 
     # We don't want to change the filename in this process so we copy the
     # infile and remove the symbolic link. And then recreate the file at the
@@ -208,7 +208,7 @@ process cohort_mask_vcfs {
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
     MASK_FILE=\${BNAME}_cohort_masked.vcf
-    MASK_DIR=$params.mask_dir_cohort
+    MASK_DIR=$params.mask_cohort_dir
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
@@ -444,10 +444,10 @@ def usage_message() {
     log.info '    --no_sg_reciprocal  Don\'t use a reciprocal overlap for the filter option'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
-    log.info '    --mask_dir_artifacts'
-    log.info '                    Directory with bed files for artifact filtering (default: mask_artifacts)'
-    log.info '    --mask_dir_cohort'
-    log.info '                    Directory with bed files for cohort filtering (default: mask_cohort)'
+    log.info '    --mask_artifacts_dir'
+    log.info '                    Directory with bed files for artifact filtering (default: mask_artifacts/)'
+    log.info '    --mask_cohort_dir'
+    log.info '                    Directory with bed files for cohort filtering (default: mask_cohort/)'
     log.info ''
 }
 
