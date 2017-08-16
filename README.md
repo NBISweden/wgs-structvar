@@ -29,11 +29,32 @@ You can choose to run either of the two structural variation callers or both
 
 ### Masking
 
+#### Artifact masking
+
 The pipeline will use the following mask files to remove known artifacts:
 
 * From [cc2qe/speedseq](https://github.com/cc2qe/speedseq): https://github.com/cc2qe/speedseq/raw/master/annotations/ceph18.b37.lumpy.exclude.2014-01-15.bed
 * From [lh3/varcmp](https://github.com/lh3/varcmp): https://github.com/lh3/varcmp/raw/master/scripts/LCR-hs37d5.bed.gz
 
+You can configure the location of the artifact mask files with the
+`--mask_artifact_dir` command line option.
+
+
+#### Cohort masking
+
+The pipeline can take bed files to filter variants. To run the pipeline with
+filters put the `bed` files in the `mask_cohort/` subdirectory and add the
+`mask_cohort` option to the `--steps` comma separated command line argument, eg:
+
+```bash
+mkdir mask_cohort
+cp some_bed_file.bed mask_cohort/
+
+nextflow run NBISweden/wgs-structvar --project <uppmax_project_id> --bam <bamfile.bam> --steps manta,normalize,vep,mask_cohort
+```
+
+You can configure the location of the cohort mask files with the
+`--mask_cohort_dir` command line option.
 
 ## Detailed usage
 
