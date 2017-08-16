@@ -203,7 +203,7 @@ process cohort_mask_vcfs {
     tag "$uuid $svfile"
 
     executor choose_executor()
-    when 'filter' in workflowSteps
+    when 'mask_cohort' in workflowSteps
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
@@ -439,7 +439,7 @@ def usage_message() {
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
     log.info '                Extra: normalize (with vt),'
-    log.info '                       filter (with bed files in mask_cohort/)'
+    log.info '                       mask_cohort (with bed files in mask_cohort/)'
     log.info '    --sg_mask_ovlp  Fractional overlap for use with the filter option'
     log.info '    --no_sg_reciprocal  Don\'t use a reciprocal overlap for the filter option'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'

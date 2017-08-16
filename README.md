@@ -66,7 +66,7 @@ Options:
                 Callers: manta, fermikit
                 Annotation: vep, snpeff
                 Extra: normalize (with vt),
-                       filter (with bed files in mask_cohort/)
+                       mask_cohort (with bed files in mask_cohort/)
     --sg_mask_ovlp  Fractional overlap for use with the filter option
     --no_sg_reciprocal  Don't use a reciprocal overlap for the filter option
     --outdir        Directory where resultfiles are stored (default: results)
