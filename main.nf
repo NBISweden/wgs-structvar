@@ -175,18 +175,18 @@ process artifact_mask_vcfs {
     # We don't want to change the filename in this process so we copy the
     # infile and remove the symbolic link. And then recreate the file at the
     # end.
-    cp $svfile workfile
-    rm $svfile # It's a link, should be ok :)
+    cp "$svfile" workfile
+    rm "$svfile" # It's a link, should be ok :)
     for mask in \$MASK_DIR/*; do
-        if [ ! -f "\$mask" ]; then
-            break
+        if [[ ! -f "\$mask" ]]; then
+            continue
         fi
         cat workfile \
-            | bedtools intersect -header -v -a stdin -b \$mask -f 0.25 \
+            | bedtools intersect -header -v -a stdin -b "\$mask" -f 0.25 \
             > tempfile
         mv tempfile workfile
     done
-    mv workfile $svfile
+    mv workfile "$svfile"
     """
 }
 
@@ -212,15 +212,15 @@ process cohort_mask_vcfs {
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
-        if [ ! -f "\$mask" ]; then
-            break
+        if [[ ! -f "\$mask" ]]; then
+            continue
         fi
         cat workfile \
-            | bedtools intersect -header -v -a stdin -b \$mask -f $params.sg_mask_ovlp $reciprocal \
+            | bedtools intersect -header -v -a stdin -b "\$mask" -f "$params.sg_mask_ovlp" "$reciprocal" \
             > tempfile
         mv tempfile workfile
     done
-    mv workfile \$MASK_FILE
+    mv workfile "\$MASK_FILE"
     """
 }
 
