@@ -66,7 +66,7 @@ Options:
                 Callers: manta, fermikit
                 Annotation: vep, snpeff
                 Extra: normalize (with vt),
-                       filter (with bed files in masks_filters/, by default swegen is used)
+                       filter (with bed files in mask_cohort/)
     --sg_mask_ovlp  Fractional overlap for use with the filter option
     --no_sg_reciprocal  Don't use a reciprocal overlap for the filter option
     --outdir        Directory where resultfiles are stored (default: results)
@@ -114,10 +114,10 @@ file. That file also specifies how to deal with errors and the interaction
 with the Slurm scheduler, you probably don't want to change those unless you
 know what you are doing.
 
-The two folders `masks_artifacts` and `masks_filters` contain bed files to
+The two folders `mask_artifacts` and `mask_cohort` contain bed files to
 filter the vcf-files from the callers. The artifact directory contains files
-that should mask out problematic regions, it removes everything that has an
-overlaps at least 25% with a region in the artifact mask. The filter one is
+that should remove problematic regions, it removes everything that has an
+overlap of at least 25% with a region in the artifact mask. The cohort one is
 for more stringent filtering of already known variants, and here the default
 filter threshold is instead a reciprocal overlap of 95%. It can be customized
 with the two options `sg_mask_ovlp` (default 0.95) and `no_sg_reciprocal`.

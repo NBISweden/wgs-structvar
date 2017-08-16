@@ -170,7 +170,7 @@ process artifact_mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_DIR=$params.mask_dirs.masks_artifacts
+    MASK_DIR=$params.mask_dir_artifacts
 
     # We don't want to change the filename in this process so we copy the
     # infile and remove the symbolic link. And then recreate the file at the
@@ -191,14 +191,14 @@ process artifact_mask_vcfs {
 }
 
 
-ch_noswegen_mask = ch_artifact_masked_vcfs.tap { ch_swegen_mask_in }
+ch_nocohort_mask = ch_artifact_masked_vcfs.tap { ch_cohort_mask_in }
 reciprocal = params.no_sg_reciprocal ? '': '-r'
 
-process swegen_mask_vcfs {
+process cohort_mask_vcfs {
     input:
-        set file(svfile), val(uuid), val(dir) from ch_swegen_mask_in
+        set file(svfile), val(uuid), val(dir) from ch_cohort_mask_in
     output:
-        set file('*_swegen_masked.vcf'), val(uuid), val(dir) into ch_swegen_masked_vcfs
+        set file('*_cohort_masked.vcf'), val(uuid), val(dir) into ch_cohort_masked_vcfs
 
     tag "$uuid $svfile"
 
@@ -207,8 +207,8 @@ process swegen_mask_vcfs {
 
     """
     BNAME=\$( echo $svfile | cut -d. -f1 )
-    MASK_FILE=\${BNAME}_swegen_masked.vcf
-    MASK_DIR=$params.mask_dirs.masks_filters
+    MASK_FILE=\${BNAME}_cohort_masked.vcf
+    MASK_DIR=$params.mask_dir_cohort
 
     cp $svfile workfile
     for mask in \$MASK_DIR/*; do
@@ -224,7 +224,7 @@ process swegen_mask_vcfs {
     """
 }
 
-ch_masked_vcfs = ch_noswegen_mask.mix(ch_swegen_masked_vcfs)
+ch_masked_vcfs = ch_nocohort_mask.mix(ch_cohort_masked_vcfs)
 
 // To make intersect files we need to combine them into one channel with
 // toList() and then sort in the map so that fermi is before manta in the
@@ -439,7 +439,7 @@ def usage_message() {
     log.info '                Callers: manta, fermikit'
     log.info '                Annotation: vep, snpeff'
     log.info '                Extra: normalize (with vt),'
-    log.info '                       filter (with bed files in masks_filters/, by default swegen is used)'
+    log.info '                       filter (with bed files in mask_cohort/)'
     log.info '    --sg_mask_ovlp  Fractional overlap for use with the filter option'
     log.info '    --no_sg_reciprocal  Don\'t use a reciprocal overlap for the filter option'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
