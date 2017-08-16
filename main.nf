@@ -444,6 +444,10 @@ def usage_message() {
     log.info '    --no_sg_reciprocal  Don\'t use a reciprocal overlap for the filter option'
     log.info '    --outdir        Directory where resultfiles are stored (default: results)'
     log.info '    --prefix        Prefix for result filenames (default: no prefix)'
+    log.info '    --mask_dir_artifacts'
+    log.info '                    Directory with bed files for artifact filtering (default: mask_artifacts)'
+    log.info '    --mask_dir_cohort'
+    log.info '                    Directory with bed files for cohort filtering (default: mask_cohort)'
     log.info ''
 }
 
