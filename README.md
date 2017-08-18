@@ -26,6 +26,11 @@ This is a pipeline for running the two structural variation callers fermikit
 and manta on UPPMAX.
 You can choose to run either of the two structural variation callers or both
 (and generate summary files).
+The main focus on this pipeline is to enable better comparisions with the
+SweGen dataset, the default parameters for the tools are the same that were
+used for that dataset. If you have access to the structural variants in the
+swegen dataset you can add that file to the pipeline and thereby have the
+ability to filter population specific variants.
 
 ### Masking
 
@@ -47,10 +52,9 @@ filters put the `bed` files in the `mask_cohort/` subdirectory and add the
 `mask_cohort` option to the `--steps` comma separated command line argument, eg:
 
 ```bash
-mkdir mask_cohort
-cp some_bed_file.bed mask_cohort/
+cp some_bed_file.bed <path-to-wgs-structvar>/mask_cohort/
 
-nextflow run NBISweden/wgs-structvar --project <uppmax_project_id> --bam <bamfile.bam> --steps manta,normalize,vep,mask_cohort
+nextflow run <path-to-wgs-structvar>/main.nf --project <uppmax_project_id> --bam <bamfile.bam> --steps manta,normalize,vep,mask_cohort
 ```
 
 You can configure the location of the cohort mask files with the
