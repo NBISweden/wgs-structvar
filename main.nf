@@ -89,9 +89,16 @@ process manta {
 
     script:
     """
+    if [ -z "\$SLURM_CPUS_ON_NODE" ]; then
+        CPUS=1
+    else
+        CPUS=\$SLURM_CPUS_ON_NODE
+    fi
+
+    echo "CPUS: \$CPUS"
     configManta.py --normalBam $bamfile --referenceFasta $params.ref_fasta --runDir testRun
     cd testRun
-    ./runWorkflow.py -m local -j \$SLURM_CPUS_ON_NODE
+    ./runWorkflow.py -m local -j \$CPUS
     gunzip -c results/variants/diploidSV.vcf.gz > ../manta.vcf
     """
 }
@@ -145,9 +152,15 @@ process fermikit {
 
     script:
     """
-    fermi2.pl unitig -s3g -t\$SLURM_CPUS_ON_NODE -l150 -p sample sample.fq.gz > sample.mak
+    if [ -z "\$SLURM_CPUS_ON_NODE" ]; then
+        CPUS=1
+    else
+        CPUS=\$SLURM_CPUS_ON_NODE
+    fi
+
+    fermi2.pl unitig -s3g -t\$CPUS -l150 -p sample sample.fq.gz > sample.mak
     make -f sample.mak
-    run-calling -t\$SLURM_CPUS_ON_NODE $params.ref_fasta sample.mag.gz > calling.sh
+    run-calling -t\$CPUS $params.ref_fasta sample.mag.gz > calling.sh
     bash calling.sh
     vcf-sort -c sample.sv.vcf.gz > fermikit.vcf
     bgzip -c fermikit.vcf > fermikit.vcf.gz
@@ -356,6 +369,12 @@ process variant_effect_predictor {
         exit 0
     fi
 
+    if [ -z "\$SLURM_CPUS_ON_NODE" ]; then
+        CPUS=1
+    else
+        CPUS=\$SLURM_CPUS_ON_NODE
+    fi
+
     variant_effect_predictor.pl \
         -i "\$INFILE"              \
         --format "\$FORMAT"        \
@@ -373,7 +392,7 @@ process variant_effect_predictor {
         --total_length             \
         --canonical                \
         --ccds                     \
-        \$( test "\$SLURM_CPUS_ON_NODE" -gt 1 && echo "--fork \$SLURM_CPUS_ON_NODE" ) \
+        \$( test "\$CPUS" -gt 1 && echo "--fork \$CPUS" ) \
         --fields Consequence,Codons,Amino_acids,Gene,SYMBOL,Feature,EXON,PolyPhen,SIFT,Protein_position,BIOTYPE \
         --assembly "\$ASSEMBLY" \
         --offline
