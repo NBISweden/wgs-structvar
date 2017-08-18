@@ -353,7 +353,7 @@ process variant_effect_predictor {
     """
     INFILE="$infile"
     OUTFILE="\${INFILE%.vcf}.vep.vcf"
-    VEP_CACHE="/sw/data/uppnex/vep/84"
+    VEP_CACHE="/sw/data/uppnex/vep/$params.vep_cache_version"
     ASSEMBLY="$params.assembly"
 
     case "\$INFILE" in
