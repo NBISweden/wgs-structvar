@@ -493,7 +493,7 @@ def check_input_params() {
 }
 
 def startup_message() {
-    revision = grab_git_revision() ?: 'v0.2'
+    revision = grab_git_revision() ?: 'v1.1'
 
     log.info "======================"
     log.info "WGS-structvar pipeline"
