@@ -136,14 +136,16 @@ by e.g. `tail -f .nextflow.log`
 There are three ways to run the pipeline:
 ```bash
 # Local run on node where one is logged in
-nextflow main.nf -profile local <options>
+nextflow main.nf -profile local<cluster> <options>
 
 # Called from login node, nextflow will queue SLURM jobs itself
-nextflow main.nf <options>
+nextflow main.nf -profile <cluster> <options>
 
 # When running inside a SLURM job nextflow will run on the local node
-srun nextflow main.nf <options>
+srun nextflow main.nf -profile local<cluster> <options>
 ```
+
+Where `<cluster>` can be either _bianca_ or _milou_.
 
 ### Customization
 
