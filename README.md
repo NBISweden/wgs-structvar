@@ -169,6 +169,12 @@ with the two options `sg_mask_ovlp` (default 0.95) and `no_sg_reciprocal`.
 
 If you need help with this module, please create a [support issue](https://github.com/NBISweden/wgs-structvar/issues/new?title=Support&body=Describe%20your%20error%20here.%0A%0AInclude%20as%20much%20information%20as%20possible,%20especially%20what%20system%20you%20ran%20this%20on,%20the%20.nextflow.log%20and%20the%20terminal%20output%20from%20the%20program.%0A%0ARemember%20that%20this%20is%20a%20public%20form,%20don%27t%20include%20private%20information.) in github.
 
+## Other tools for generating structural variants
+
+- https://github.com/J35P312/FindSV
+- https://github.com/J35P312/SVDB
+
+
 ## External links
 
 * [NextFlow website](http://www.nextflow.io)
