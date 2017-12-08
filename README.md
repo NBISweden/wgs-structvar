@@ -173,5 +173,3 @@ If you need help with this module, please create a [support issue](https://githu
 
 * [NextFlow website](http://www.nextflow.io)
 * [NextFlow gitter chat](https://gitter.im/nextflow-io/nextflow)
-
-[![Stories in Ready](https://badge.waffle.io/NBISweden/wgs-structvar.png?label=ready&title=Ready)](https://waffle.io/NBISweden/wgs-structvar)
